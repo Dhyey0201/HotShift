@@ -37,6 +37,8 @@ def build_cuda_extension(verbose: bool = False):
         extra_cflags=["-O3", "-std=c++17"],
         extra_cuda_cflags=["-O3", "-std=c++17"],
         with_cuda=True,
+        # Operators are registered by TORCH_LIBRARY; there is no CPython PyInit module.
+        is_python_module=False,
         verbose=verbose,
     )
 
