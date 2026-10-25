@@ -62,3 +62,31 @@ else:
 
 Kaggle GPU availability and installed tools vary. If the cell reports that `nvcc` is missing, this runtime cannot compile the CUDA extension. Kaggle may also deny Nsight Compute access to GPU performance counters (`ERR_NVGPUCTRPERM`); the benchmark artifact is still saved when that happens. The short `bench-cuda --smoke` run is functional evidence only; use `configs/benchmark.yaml` for the full repeated matrix. `hotshift bench` remains CPU replay only.
 
+## Full repeated GPU benchmark
+
+The validation cell above is enough for correctness. To run the full benchmark after it succeeds, paste this second block into a new Kaggle code cell. It generates the standard dataset, runs four traffic scenarios × five policies × three batch sizes × three seeds, and writes the result under `artifacts/runs/`. It is substantially longer than the smoke run and consumes Kaggle GPU quota.
+
+```python
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+def run(*command):
+    print("$", " ".join(command), flush=True)
+    subprocess.run(command, check=True)
+
+if not Path("configs/benchmark.yaml").is_file():
+    roots = [Path("/kaggle/working/HotShift"), *Path("/kaggle/working").glob("hotshift-*/HotShift")]
+    repo = next((path for path in roots if (path / "configs/benchmark.yaml").is_file()), None)
+    if repo is None:
+        raise RuntimeError("Run the HotShift validation cell first so the repository is cloned.")
+    os.chdir(repo)
+
+run(sys.executable, "-m", "hotshift.cli", "data", "generate", "--config", "configs/benchmark.yaml")
+run(sys.executable, "-m", "hotshift.cli", "bench-cuda", "--matrix", "configs/benchmark.yaml")
+run(sys.executable, "-m", "hotshift.cli", "report", "--runs", "artifacts/runs", "--output", "artifacts/runs/REPORT.md")
+```
+
+`REPORT.md` is saved in `artifacts/runs/`; each run directory contains its `summary.json`, `manifest.json`, raw batch samples, traces, and checksums. The benchmark uses serialized host planning and CUDA execution; its results describe this T4 runtime and do not claim an asynchronous speedup.
+
