@@ -20,7 +20,9 @@ except Exception as error:
     raise RuntimeError("Kaggle cannot reach GitHub. Enable Internet in notebook Settings, restart the session, and rerun this cell.") from error
 
 repo = "/kaggle/working/HotShift"
-if not os.path.isdir(os.path.join(repo, ".git")):
+if os.path.isdir(os.path.join(repo, ".git")):
+    run("git", "-C", repo, "pull", "--ff-only")
+else:
     repo = os.path.join(tempfile.mkdtemp(prefix="hotshift-", dir="/kaggle/working"), "HotShift")
     run("git", "clone", "https://github.com/Dhyey0201/HotShift.git", repo)
 os.chdir(repo)
