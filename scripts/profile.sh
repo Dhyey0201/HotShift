@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v nsys >/dev/null 2>&1; then
-  echo "BLOCKED: Nsight Systems (nsys) is not installed" >&2
-  exit 2
-fi
 if [[ $# -eq 0 ]]; then
   echo "Usage: bash scripts/profile.sh --matrix configs/benchmark.yaml [--smoke]" >&2
+  exit 2
+fi
+if ! command -v nsys >/dev/null 2>&1 && ! command -v ncu >/dev/null 2>&1; then
+  echo "BLOCKED: neither Nsight Systems (nsys) nor Nsight Compute (ncu) is installed" >&2
   exit 2
 fi
 mkdir -p artifacts/profiles
 python3 -m hotshift.cli preflight --backend cuda
 python3 -m hotshift.cli build-extension
 profile_name="artifacts/profiles/hotshift-$(date -u +%Y%m%dT%H%M%SZ)"
-nsys profile --trace=cuda,nvtx,osrt --output="$profile_name" \
-  python3 -m hotshift.cli bench-cuda "$@"
+if command -v nsys >/dev/null 2>&1; then
+  nsys profile --trace=cuda,nvtx,osrt --output="$profile_name" \
+    python3 -m hotshift.cli bench-cuda "$@"
+else
+  # Collect a small representative kernel sample; Nsight Compute is not a system timeline.
+  ncu --set basic --launch-count 12 --force-overwrite --export="$profile_name-compute" \
+    python3 -m hotshift.cli bench-cuda "$@"
+fi

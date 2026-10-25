@@ -8,7 +8,7 @@ This is an engineering demonstration, not a trained recommender or production se
 
 ## Current status
 
-CPU generation, reference pooling, policy simulation, API, and dashboard are implemented and validated locally. A user-provided Kaggle GPU run successfully built the CUDA extension, passed all six CUDA operator tests, and completed Compute Sanitizer checks with zero reported errors or hazards. End-to-end GPU cache validation, Nsight profiles, and GPU performance measurements are still outstanding. CPU replay statistics do not predict GPU speedups.
+CPU generation, reference pooling, policy simulation, API, and dashboard are implemented and validated. On Kaggle, the CUDA extension built, all 27 CPU/API/CUDA tests passed, the cache/API path passed all four Compute Sanitizer tools, and a CUDA smoke benchmark ran on a Tesla T4. The full repeated GPU matrix, profiler capture, Docker execution, and license decision remain outstanding. CPU replay statistics do not predict GPU speedups.
 
 ## Quick start
 

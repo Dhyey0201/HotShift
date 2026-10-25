@@ -2,7 +2,7 @@
 
 ## Environment and milestone
 
-CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/build, and browser validation pass on Apple Silicon with Python 3.14. A user-provided Kaggle GPU run built the CUDA extension, passed all six CUDA operator tests, and completed Compute Sanitizer memcheck, initcheck, synccheck, and racecheck with zero reported errors/hazards. The local Apple Silicon host still has no `nvidia-smi`/`nvcc`; Kaggle GPU model and toolchain versions were not included in the run output.
+CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/build, and browser validation pass on Apple Silicon with Python 3.14. The Kaggle GPU run used a Tesla T4 runtime with Python 3.13.15, PyTorch 2.11.0+cu128, and CUDA toolkit 12.8.93. The extension built; all 27 CPU/API/CUDA tests passed; Compute Sanitizer memcheck, initcheck, synccheck, and racecheck each passed all 10 CUDA tests with zero reported errors/hazards. A CUDA smoke benchmark artifact was generated. The local Apple Silicon host still has no `nvidia-smi`/`nvcc`; Nsight Systems is unavailable in the Kaggle image, though Nsight Compute (`ncu`) is present.
 
 ## Implemented
 
@@ -18,8 +18,8 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 
 ## Not yet proven or incomplete
 
-- New end-to-end `CUDACacheEngine` state/admission tests and CUDA-backed API tests have not yet been run on a GPU.
-- CUDA benchmark runner and Nsight profile path are implemented but have not yet been run; no GPU performance results exist.
+- Only the CUDA smoke benchmark has been run; the full repeated scenario/policy/batch matrix and performance analysis remain.
+- Nsight Systems profiling has not been run because `nsys` is absent from the Kaggle image. Nsight Compute is present but no capture has been collected.
 - Docker image and Compose flow have not been validated in this environment.
 - External baseline adapters and a license decision remain outstanding. A license must be selected by the project owner before code reuse is authorized.
 
@@ -29,14 +29,14 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 | --- | --- | --- | --- |
 | R01 | Correct mean pooling | validated for tested operator cases | CPU reference plus CUDA pooling tests passed on Kaggle, including awkward dimensions and empty histories |
 | R02 | Custom CUDA operations | validated for tested operators | Extension build succeeded; 6 CUDA tests passed; Compute Sanitizer reported zero errors/hazards |
-| R03 | Bounded GPU cache | partial | Engine and lifecycle tests implemented; rerun the new engine tests on Kaggle |
-| R04 | Safe slot reuse | partial | Sanitizers passed on operators; rerun against new cache replacement tests |
+| R03 | Bounded GPU cache | validated for tested cases | Cache lifecycle, static preload/reset, no-cache, and eviction tests passed on Kaggle |
+| R04 | Safe slot reuse | validated for tested cases | Cache replacement tests passed under all four Compute Sanitizer tools; broader long-running stress remains |
 | R05 | Adaptive behavior | implemented on CPU | Policy and deterministic shift tests pass; GPU deployment unverified |
 | R06 | Fair comparison | partial | CPU/GPU replay runners and repeated trace matrix implemented; GPU matrix and additional reference baselines remain |
-| R07 | Bounded serving | implemented on CPU | CPU API integration tests pass; CUDA-backed API path not yet exercised |
+| R07 | Bounded serving | validated on CPU and CUDA smoke path | CPU integration and CUDA-backed API tests passed |
 | R08 | Live dashboard | implemented | Frontend tests/build and Playwright journey pass |
 | R09 | Reproducible build | partial | CPU/frontend validation and CUDA extension build pass; Docker image/Compose execution remains unverified |
-| R10 | Performance explanation | blocked | Requires actual Nsight captures and measurements |
+| R10 | Performance explanation | blocked | Requires full repeated GPU measurements and a profiler capture; `nsys` unavailable in current Kaggle image |
 | R11 | Honest reporting | implemented | CPU/GPU limits and unverified GPU evidence are called out |
 | R12 | Usable handoff | partial | Guides and commands present; owner license decision and CUDA release gate remain |
 
@@ -47,7 +47,7 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 - `npm run test --prefix frontend`: 2 passed; `npm run build --prefix frontend`: passed (Vite reports a large bundle warning).
 - `npm run test:e2e --prefix frontend`: 1 passed.
 - CPU smoke benchmark generated a run directory under `artifacts/runs/` with manifest, summary, trace, CSVs, events, and checksums.
-- User-reported Kaggle CUDA run: `build-extension` succeeded; `pytest tests/cuda -m cuda -q` passed 6 tests; Compute Sanitizer memcheck, initcheck, and synccheck each reported 0 errors, while racecheck reported 0 hazards. GPU model and versions were not captured.
+- User-reported Kaggle validation: Tesla T4, Python 3.13.15, PyTorch 2.11.0+cu128, CUDA toolkit 12.8.93; extension build succeeded; all 27 tests passed; each sanitizer tool passed 10 CUDA tests with zero errors/hazards; CUDA smoke benchmark artifact `20261025T050501Z-cuda-cc1c7439` was generated. `ncu` is available; `nsys` is not.
 - Local follow-up: 17 CPU/API tests pass; 3 CUDA modules are skipped locally because PyTorch/CUDA is unavailable. Ruff, Python compile checks, CPU smoke benchmark, dashboard build, and Playwright pass.
 - Local preflight remains blocked because this Apple Silicon host lacks an NVIDIA GPU, CUDA toolkit, and CUDA-enabled PyTorch runtime.
 
@@ -62,4 +62,4 @@ npm install --prefix frontend
 npm run test --prefix frontend && npm run build --prefix frontend
 ```
 
-Next, pull the latest `main` in Kaggle and rerun `docs/KAGGLE.md`. This now includes end-to-end cache/API tests and a CUDA smoke benchmark. Capture the GPU/toolchain versions, inspect the artifact, then run the full repeated matrix and Nsight profile. Run `python3 scripts/release_check.py` on the owner’s supported environment. No assistant attribution has been added.
+Next, inspect the generated smoke artifact, run `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml` for the full repeated matrix, and capture a GPU profile with Nsight Systems or Compute. Run the Docker/Compose flow and resolve the project license choice before calling this a complete reusable public release. No assistant attribution has been added.

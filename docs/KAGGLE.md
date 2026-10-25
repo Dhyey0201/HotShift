@@ -48,6 +48,12 @@ run(sys.executable, "-m", "hotshift.cli", "build-extension")
 run(sys.executable, "-m", "pytest", "tests/cpu", "tests/integration", "tests/cuda", "-q")
 run(sys.executable, "-m", "hotshift.cli", "bench-cuda", "--matrix", "configs/smoke.yaml", "--smoke")
 
+if shutil.which("nsys") or shutil.which("ncu"):
+    try:
+        run("bash", "scripts/profile.sh", "--matrix", "configs/smoke.yaml", "--smoke")
+    except subprocess.CalledProcessError as error:
+        print(f"Profiler could not run in this Kaggle session (exit {error.returncode}); benchmark results are still saved.")
+
 if shutil.which("compute-sanitizer"):
     run("bash", "scripts/run_sanitizers.sh")
 else:
