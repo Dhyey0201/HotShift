@@ -2,7 +2,7 @@
 
 ## Environment and milestone
 
-CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/build, and browser validation pass on Apple Silicon with Python 3.14. The Kaggle GPU run used a Tesla T4 runtime with Python 3.13.15, PyTorch 2.11.0+cu128, and CUDA toolkit 12.8.93. The extension built; all 27 CPU/API/CUDA tests passed; Compute Sanitizer memcheck, initcheck, synccheck, and racecheck each passed all 10 CUDA tests with zero reported errors/hazards. A CUDA smoke benchmark artifact was generated. The local Apple Silicon host still has no `nvidia-smi`/`nvcc`; Nsight Systems is unavailable in the Kaggle image, though Nsight Compute (`ncu`) is present.
+CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/build, and browser validation pass on Apple Silicon with Python 3.14. The Kaggle GPU run used a Tesla T4 runtime with Python 3.13.15, PyTorch 2.11.0+cu128, and CUDA toolkit 12.8.93. The extension built; all 27 CPU/API/CUDA tests passed; Compute Sanitizer memcheck, initcheck, synccheck, and racecheck each passed all 10 CUDA tests with zero reported errors/hazards. CUDA smoke benchmark artifacts were generated. Profiling was attempted with `ncu` but Kaggle denied performance-counter access (`ERR_NVGPUCTRPERM`); `nsys` is not installed. The local Apple Silicon host has no `nvidia-smi`/`nvcc`.
 
 ## Implemented
 
@@ -19,7 +19,7 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 ## Not yet proven or incomplete
 
 - Only the CUDA smoke benchmark has been run; the full repeated scenario/policy/batch matrix and performance analysis remain.
-- Nsight Systems profiling has not been run because `nsys` is absent from the Kaggle image. Nsight Compute is present but no capture has been collected.
+- No profiler capture is available: Kaggle lacks `nsys` and denies `ncu` access to GPU performance counters with `ERR_NVGPUCTRPERM`.
 - Docker image and Compose flow have not been validated in this environment.
 - External baseline adapters and a license decision remain outstanding. A license must be selected by the project owner before code reuse is authorized.
 
@@ -36,7 +36,7 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 | R07 | Bounded serving | validated on CPU and CUDA smoke path | CPU integration and CUDA-backed API tests passed |
 | R08 | Live dashboard | implemented | Frontend tests/build and Playwright journey pass |
 | R09 | Reproducible build | partial | CPU/frontend validation and CUDA extension build pass; Docker image/Compose execution remains unverified |
-| R10 | Performance explanation | blocked | Requires full repeated GPU measurements and a profiler capture; `nsys` unavailable in current Kaggle image |
+| R10 | Performance explanation | blocked | Requires full repeated GPU measurements and a profiler capture; Kaggle lacks `nsys` and denies `ncu` performance-counter access |
 | R11 | Honest reporting | implemented | CPU/GPU limits and unverified GPU evidence are called out |
 | R12 | Usable handoff | partial | Guides and commands present; owner license decision and CUDA release gate remain |
 
@@ -47,7 +47,7 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 - `npm run test --prefix frontend`: 2 passed; `npm run build --prefix frontend`: passed (Vite reports a large bundle warning).
 - `npm run test:e2e --prefix frontend`: 1 passed.
 - CPU smoke benchmark generated a run directory under `artifacts/runs/` with manifest, summary, trace, CSVs, events, and checksums.
-- User-reported Kaggle validation: Tesla T4, Python 3.13.15, PyTorch 2.11.0+cu128, CUDA toolkit 12.8.93; extension build succeeded; all 27 tests passed; each sanitizer tool passed 10 CUDA tests with zero errors/hazards; CUDA smoke benchmark artifact `20261025T050501Z-cuda-cc1c7439` was generated. `ncu` is available; `nsys` is not.
+- User-reported Kaggle validation: Tesla T4, Python 3.13.15, PyTorch 2.11.0+cu128, CUDA toolkit 12.8.93; extension build succeeded; all 27 tests passed; each sanitizer tool passed 10 CUDA tests with zero errors/hazards; CUDA smoke artifacts `20261025T050501Z-cuda-cc1c7439` and `20261025T060823Z-cuda-925bdad4` were generated. `ncu` reported `ERR_NVGPUCTRPERM`; `nsys` is absent.
 - Local follow-up: 17 CPU/API tests pass; 3 CUDA modules are skipped locally because PyTorch/CUDA is unavailable. Ruff, Python compile checks, CPU smoke benchmark, dashboard build, and Playwright pass.
 - Local preflight remains blocked because this Apple Silicon host lacks an NVIDIA GPU, CUDA toolkit, and CUDA-enabled PyTorch runtime.
 
@@ -62,4 +62,4 @@ npm install --prefix frontend
 npm run test --prefix frontend && npm run build --prefix frontend
 ```
 
-Next, inspect the generated smoke artifact, run `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml` for the full repeated matrix, and capture a GPU profile with Nsight Systems or Compute. Run the Docker/Compose flow and resolve the project license choice before calling this a complete reusable public release. No assistant attribution has been added.
+Next, run `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml` for the full repeated matrix on a host that permits GPU profiling, then inspect the results. Run the Docker/Compose flow and resolve the project license choice before calling this a complete reusable public release. No assistant attribution has been added.

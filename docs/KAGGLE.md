@@ -60,4 +60,5 @@ else:
     print("SKIPPED: Compute Sanitizer is not installed in this Kaggle image.")
 ```
 
-Kaggle GPU availability and installed tools vary. If the cell reports that `nvcc` is missing, this runtime cannot compile the CUDA extension. The short `bench-cuda --smoke` run is functional evidence only; use `configs/benchmark.yaml` for the full repeated matrix. `hotshift bench` remains CPU replay only.
+Kaggle GPU availability and installed tools vary. If the cell reports that `nvcc` is missing, this runtime cannot compile the CUDA extension. Kaggle may also deny Nsight Compute access to GPU performance counters (`ERR_NVGPUCTRPERM`); the benchmark artifact is still saved when that happens. The short `bench-cuda --smoke` run is functional evidence only; use `configs/benchmark.yaml` for the full repeated matrix. `hotshift bench` remains CPU replay only.
+
