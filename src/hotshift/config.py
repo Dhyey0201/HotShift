@@ -48,7 +48,7 @@ def load_config(path: str | Path) -> HotShiftConfig:
     with config_path.open("r", encoding="utf-8") as stream:
         raw = yaml.safe_load(stream)
     if not isinstance(raw, dict):
-        raise ValueError("configuration must be a YAML mapping")
+        raise TypeError("configuration must be a YAML mapping")
 
     unexpected = set(raw) - {"profile", "data", "cache", "limits", "benchmark"}
     missing = {"profile", "data", "cache", "limits"} - set(raw)
@@ -59,6 +59,9 @@ def load_config(path: str | Path) -> HotShiftConfig:
         if missing:
             details.append(f"missing keys: {', '.join(sorted(missing))}")
         raise ValueError(f"invalid configuration: {'; '.join(details)}")
+    for key in ("data", "cache", "limits"):
+        if not isinstance(raw[key], dict):
+            raise TypeError(f"{key} must be a YAML mapping")
     _require_keys(raw["data"], {"rows", "dimensions", "seed", "output_dir"}, "data")
     _require_keys(raw["cache"], {"capacity", "policy"}, "cache")
     _require_keys(
@@ -72,6 +75,14 @@ def load_config(path: str | Path) -> HotShiftConfig:
         },
         "limits",
     )
+    if "benchmark" in raw:
+        if not isinstance(raw["benchmark"], dict):
+            raise ValueError("benchmark must be a YAML mapping")
+        extra_benchmark_keys = set(raw["benchmark"]) - {
+            "scenarios", "policies", "microbatch_sizes", "history_length", "requests"
+        }
+        if extra_benchmark_keys:
+            raise ValueError(f"invalid benchmark: unknown keys: {', '.join(sorted(extra_benchmark_keys))}")
 
     data = raw["data"]
     cache = raw["cache"]
@@ -92,10 +103,12 @@ def load_config(path: str | Path) -> HotShiftConfig:
     )
     if result.rows <= 0 or result.dimensions <= 0:
         raise ValueError("data.rows and data.dimensions must be positive")
+    if result.rows >= 2**31 or result.dimensions > 4096:
+        raise ValueError("data rows or dimensions exceed supported bounds")
     if not 0 < result.cache_capacity <= result.rows:
         raise ValueError("cache.capacity must be between 1 and data.rows")
-    if result.policy not in {"static", "lru", "decayed_lfu", "adaptive"}:
-        raise ValueError("cache.policy must be static, lru, decayed_lfu, or adaptive")
+    if result.policy not in {"no_cache", "static", "lru", "decayed_lfu", "adaptive"}:
+        raise ValueError("cache.policy must be no_cache, static, lru, decayed_lfu, or adaptive")
     if min(
         result.max_history_ids,
         result.max_batch_requests,
@@ -105,5 +118,7 @@ def load_config(path: str | Path) -> HotShiftConfig:
         raise ValueError("request and queue limits must be positive")
     if result.max_batch_delay_ms <= 0:
         raise ValueError("limits.max_batch_delay_ms must be positive")
+    if result.max_history_ids > 256 or result.max_batch_requests > 64 or result.max_batch_ids > 16384 or result.max_batch_delay_ms > 100:
+        raise ValueError("request and batch limits exceed supported bounds")
     return result
 

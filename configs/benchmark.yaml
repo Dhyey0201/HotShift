@@ -15,7 +15,7 @@ limits:
   max_batch_delay_ms: 2.0
 benchmark:
   scenarios: [stable, abrupt, brief_burst, uniform]
-  policies: [static, lru, decayed_lfu, adaptive]
+  policies: [no_cache, static, lru, decayed_lfu, adaptive]
   microbatch_sizes: [1, 16, 64]
   history_length: 32
 

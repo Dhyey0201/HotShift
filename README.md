@@ -1,29 +1,51 @@
 # HotShift
 
-HotShift is an engineering demonstration of serving pooled embedding requests from an immutable CPU table and a bounded GPU cache. The first implementation milestone provides deterministic synthetic data and a CPU reference path; custom CUDA operators, bounded serving, benchmarks, and the dashboard are still in progress.
+HotShift demonstrates a bounded embedding cache for pooled music histories. An immutable FP32 embedding table remains on the host; custom CUDA operators probe a dense GPU item map and pool cache or miss rows. The repository also contains a CPU policy simulator, deterministic synthetic traces, a bounded FastAPI service, and a React dashboard.
+
+This is an engineering demonstration, not a trained recommender or production service. The catalog is fictional. Cache policies are practical baselines and heuristics; no policy is claimed to be novel or universally faster.
+
+![HotShift CPU dashboard using live local API metrics](docs/dashboard.png)
 
 ## Current status
 
-This checkout is being developed on Apple Silicon without `nvidia-smi` or `nvcc`. CPU development can proceed here. CUDA execution, sanitizer runs, profiling, and GPU performance evidence are blocked until a suitable Linux NVIDIA environment is available. No performance results are claimed.
+CPU generation, reference pooling, policy simulation, API, and dashboard are implemented and validated locally. CUDA C++ sources and a GPU cache wrapper are implemented, but this project was authored on Apple Silicon without an NVIDIA GPU or `nvcc`. CUDA compilation/execution, sanitizers, Nsight profiles, and GPU measurements remain unverified and block a complete GPU release. CPU replay statistics do not predict GPU speedups.
 
 ## Quick start
+
+Use Python 3.11 or newer for CPU development; choose a Python release supported by the matched PyTorch CUDA build on a GPU host. Install project and API dependencies, generate the smoke fixture and catalog, then start the local CPU service and UI:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -e .
-python3 scripts/preflight.py --backend cpu
+python3 -m pip install -e '.[dev,service]'
 python3 -m hotshift.cli data generate --config configs/smoke.yaml
+python3 -m hotshift.cli data catalog --config configs/smoke.yaml
 python3 -m hotshift.cli test-reference --config configs/smoke.yaml
+python3 -m hotshift.cli serve --config configs/smoke.yaml --backend cpu
 ```
 
-The default dataset is fictional and generated locally. Embedding tables and generated artifacts are excluded from Git. See [docs/STATUS.md](docs/STATUS.md) for implemented work and the next command.
+In a second terminal, run `npm install --prefix frontend` and `npm run dev --prefix frontend`. Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:8000`; bind it to localhost for the unauthenticated demo controls.
 
-## Architecture plan
+Generate a small CPU replay and report with:
 
-The target request path validates bounded histories, batches requests, probes a custom GPU item-to-slot map, stages unique cache misses from host memory, and runs owned CUDA pooling. Cache reads and serialized maintenance share one engine owner. A CPU backend will provide the same mean-pooling contract for development and comparisons. The music catalog is synthetic and demonstrates systems behavior; it does not represent learned recommendation quality.
+```bash
+python3 -m hotshift.cli trace generate --config configs/smoke.yaml --scenario abrupt --seed 42 --requests 1000
+python3 -m hotshift.cli bench --matrix configs/smoke.yaml --smoke
+python3 -m hotshift.cli report --runs artifacts/runs
+```
 
-## Hardware and scope
+## CUDA setup
 
-CUDA development requires a compatible Linux host, NVIDIA driver and GPU, CUDA toolkit with `nvcc`, and a PyTorch build matched to that toolkit. Apple Silicon supports the CPU development path only. The target release includes static, LRU, decayed-frequency, and adaptive policies, bounded FastAPI serving, a React dashboard, reproducible traces, and raw benchmark artifacts. GPU claims require a real device and measured evidence.
+CUDA requires Linux, an NVIDIA driver and GPU, `nvcc`, a compatible host compiler, and a PyTorch build matched to the local CUDA toolkit. Install the appropriate PyTorch wheel for the target host first, then install the project. Inspect `python3 scripts/preflight.py --backend cuda`, build with `python3 -m hotshift.cli build-extension`, run `python3 -m pytest tests/cuda -m cuda`, and run `bash scripts/run_sanitizers.sh`.
 
+The GPU engine uses a dense `item_to_slot` map, a fixed-capacity row cache, bounded miss staging, a custom CUDA probe, and a fused custom mean-pooling kernel. The reference path deliberately synchronizes the probe for host miss planning and serializes cache updates. It is not an asynchronous overlapping pipeline. The entire embedding table stays on the CPU.
+
+## Development and artifacts
+
+- `configs/smoke.yaml` is for CPU correctness and UI development.
+- `configs/demo.yaml` and `configs/benchmark.yaml` describe larger profiles; preflight estimates host and device capacity before GPU runs.
+- Generated tables, traces, benchmark results, and profiler captures stay under ignored `artifacts/`.
+- The live dashboard only displays API metrics. CPU miss bytes are a source-row estimate, not measured PCIe transfer bytes.
+- Run `python3 scripts/release_check.py` for local CPU/UI checks and the CUDA gate. It returns blocked when run without a CUDA host.
+
+Read [the architecture](docs/ARCHITECTURE.md), [developer setup](docs/DEVELOPMENT.md), [benchmark protocol](docs/BENCHMARKS.md), [demo script](docs/DEMO.md), and [implementation status](docs/STATUS.md). No redistribution license is selected yet; confirm one before publishing code for reuse.

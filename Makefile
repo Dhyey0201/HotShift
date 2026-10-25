@@ -14,7 +14,7 @@ test-cuda:
 	python3 -m pytest tests/cuda -m cuda
 
 api:
-	python3 -m hotshift.cli serve --config configs/demo.yaml --backend cpu
+	python3 -m hotshift.cli serve --config configs/smoke.yaml --backend cpu
 
 ui:
 	cd frontend && npm run dev

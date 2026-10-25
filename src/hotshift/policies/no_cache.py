@@ -1,0 +1,17 @@
+from collections.abc import Iterable, Sequence
+
+from hotshift.policies.base import CachePolicy, PolicyDecision
+
+
+class NoCachePolicy(CachePolicy):
+    name = "no_cache"
+
+    def observe(self, occurrences: Sequence[int]) -> None:
+        return None
+
+    def choose(self, resident: set[int], incoming: Iterable[int], capacity: int) -> PolicyDecision:
+        return PolicyDecision(frozenset(), (), tuple(sorted(resident)))
+
+    def reset(self) -> None:
+        return None
+

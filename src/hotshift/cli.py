@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from pathlib import Path
 
 import numpy as np
 
 from hotshift.config import load_config
-from hotshift.data.generate import generate_from_config
 from hotshift.data.catalog import generate_catalog
+from hotshift.data.generate import generate_from_config
 from hotshift.data.store import EmbeddingStore
 from hotshift.engine.cpu import pool_mean_reference
 
@@ -43,6 +45,28 @@ def main(argv: list[str] | None = None) -> int:
     reference_parser.add_argument("--config", required=True)
     preflight_parser = commands.add_parser("preflight", help="inspect the selected execution backend")
     preflight_parser.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
+    trace_parser = commands.add_parser("trace", help="generate deterministic request traces")
+    trace_commands = trace_parser.add_subparsers(dest="trace_command", required=True)
+    trace_generate = trace_commands.add_parser("generate")
+    trace_generate.add_argument("--config", default="configs/smoke.yaml")
+    trace_generate.add_argument("--scenario", choices=("stable", "abrupt", "gradual", "brief_burst", "alternating", "uniform"), default="abrupt")
+    trace_generate.add_argument("--seed", type=int, default=42)
+    trace_generate.add_argument("--requests", type=int, default=10000)
+    trace_generate.add_argument("--history-length", type=int, default=32)
+    trace_generate.add_argument("--output")
+    bench_parser = commands.add_parser("bench", help="replay benchmark policies on CPU")
+    bench_parser.add_argument("--matrix", required=True)
+    bench_parser.add_argument("--smoke", action="store_true")
+    report_parser = commands.add_parser("report", help="summarize completed local runs")
+    report_parser.add_argument("--runs", default="artifacts/runs")
+    report_parser.add_argument("--output")
+    serve_parser = commands.add_parser("serve", help="start one local API worker")
+    serve_parser.add_argument("--config", default="configs/demo.yaml")
+    serve_parser.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
+    serve_parser.add_argument("--host", default=os.getenv("HOTSHIFT_HOST", "127.0.0.1"))
+    serve_parser.add_argument("--port", type=int, default=int(os.getenv("HOTSHIFT_PORT", "8000")))
+    build_parser = commands.add_parser("build-extension", help="build owned CUDA operators")
+    build_parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
 
     try:
@@ -54,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
             catalog = generate_catalog(
                 config.rows, config.dimensions, config.seed, config.output_dir
             )
-            print(json.dumps({"catalog_items": len(catalog), "dataset_version": "synthetic-v1"}))
+            print(json.dumps({"catalog_items": len(catalog), "candidate_count": min(512, len(catalog)), "dataset_version": "synthetic-v1"}))
         elif args.command == "test-reference":
             _reference_smoke(args.config)
         elif args.command == "preflight":
@@ -64,8 +88,44 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, indent=2, sort_keys=True))
             if args.backend == "cuda" and result["cuda_status"] != "available":
                 return 2
+        elif args.command == "trace" and args.trace_command == "generate":
+            from hotshift.traffic.generate import generate_trace
+
+            config = load_config(args.config)
+            target = Path(args.output or f"artifacts/traces/{args.scenario}-seed{args.seed}.jsonl")
+            result = generate_trace(
+                target,
+                config.rows,
+                requests=args.requests,
+                history_length=args.history_length,
+                seed=args.seed,
+                scenario=args.scenario,
+            )
+            result["path"] = str(target)
+            print(json.dumps(result, indent=2, sort_keys=True))
+        elif args.command == "bench":
+            from hotshift.benchmark.runner import run_matrix
+
+            print(run_matrix(args.matrix, smoke=args.smoke))
+        elif args.command == "report":
+            from hotshift.benchmark.report import write_report
+
+            print(write_report(args.runs, args.output))
+        elif args.command == "serve":
+            try:
+                import uvicorn
+            except ImportError as error:
+                raise RuntimeError("install service dependencies with `pip install -e '.[service]'`") from error
+            os.environ["HOTSHIFT_CONFIG"] = args.config
+            os.environ["HOTSHIFT_BACKEND"] = args.backend
+            uvicorn.run("hotshift.serving.app:app", host=args.host, port=args.port, workers=1, reload=False)
+        elif args.command == "build-extension":
+            from hotshift.engine.cuda import build_cuda_extension
+
+            build_cuda_extension(verbose=args.verbose)
+            print("HotShift CUDA extension built and loaded")
         return 0
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, ImportError) as error:
         print(f"hotshift: {error}", file=sys.stderr)
         return 1
 
