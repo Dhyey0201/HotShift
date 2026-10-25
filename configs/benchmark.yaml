@@ -1,0 +1,21 @@
+profile: standard
+data:
+  rows: 1000000
+  dimensions: 128
+  seed: 42
+  output_dir: artifacts/data/standard
+cache:
+  capacity: 100000
+  policy: adaptive
+limits:
+  max_history_ids: 256
+  max_batch_requests: 64
+  max_batch_ids: 16384
+  queue_capacity: 1024
+  max_batch_delay_ms: 2.0
+benchmark:
+  scenarios: [stable, abrupt, brief_burst, uniform]
+  policies: [static, lru, decayed_lfu, adaptive]
+  microbatch_sizes: [1, 16, 64]
+  history_length: 32
+

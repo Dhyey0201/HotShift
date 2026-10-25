@@ -1,0 +1,16 @@
+profile: demo
+data:
+  rows: 250000
+  dimensions: 128
+  seed: 42
+  output_dir: artifacts/data/demo
+cache:
+  capacity: 25000
+  policy: adaptive
+limits:
+  max_history_ids: 256
+  max_batch_requests: 64
+  max_batch_ids: 16384
+  queue_capacity: 1024
+  max_batch_delay_ms: 2.0
+

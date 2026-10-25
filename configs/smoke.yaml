@@ -1,0 +1,16 @@
+profile: smoke
+data:
+  rows: 10000
+  dimensions: 32
+  seed: 42
+  output_dir: artifacts/data/smoke
+cache:
+  capacity: 1000
+  policy: adaptive
+limits:
+  max_history_ids: 256
+  max_batch_requests: 64
+  max_batch_ids: 16384
+  queue_capacity: 1024
+  max_batch_delay_ms: 2.0
+
