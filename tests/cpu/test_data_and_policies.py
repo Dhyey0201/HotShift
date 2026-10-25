@@ -40,6 +40,14 @@ def test_static_policy_keeps_explicit_warm_set(tmp_path):
     assert engine.resident == {1, 3}
 
 
+def test_static_policy_preloads_and_restores_its_warm_set(tmp_path):
+    generate_embeddings(8, 3, 5, tmp_path)
+    engine = CPUCacheEngine(EmbeddingStore(tmp_path), 2, StaticPolicy([1, 3, 5]))
+    assert engine.resident == {1, 3}
+    engine.reset()
+    assert engine.resident == {1, 3}
+
+
 def test_adaptive_shift_detection_is_deterministic():
     policy = AdaptivePolicy(window_occurrences=4, buckets=16, normal_budget=2, shift_budget=4)
     shifted_item = next(item for item in range(1, 1000) if policy._bucket(item) != policy._bucket(0))

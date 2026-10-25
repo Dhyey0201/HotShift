@@ -35,4 +35,9 @@ for command in commands:
 if gpu["cuda_status"] != "available":
     print("RELEASE BLOCKED: mandatory CUDA validation requires an NVIDIA CUDA host", file=sys.stderr)
     raise SystemExit(2)
+subprocess.run([sys.executable, "-m", "hotshift.cli", "data", "generate", "--config", "configs/smoke.yaml"], cwd=ROOT, check=True)
+subprocess.run([sys.executable, "-m", "hotshift.cli", "data", "catalog", "--config", "configs/smoke.yaml"], cwd=ROOT, check=True)
+subprocess.run([sys.executable, "-m", "hotshift.cli", "build-extension"], cwd=ROOT, check=True)
 subprocess.run([sys.executable, "-m", "pytest", "tests/cuda", "-m", "cuda"], cwd=ROOT, check=True)
+subprocess.run(["bash", "scripts/run_sanitizers.sh"], cwd=ROOT, check=True)
+subprocess.run([sys.executable, "-m", "hotshift.cli", "bench-cuda", "--matrix", "configs/smoke.yaml", "--smoke"], cwd=ROOT, check=True)

@@ -79,10 +79,28 @@ def load_config(path: str | Path) -> HotShiftConfig:
         if not isinstance(raw["benchmark"], dict):
             raise ValueError("benchmark must be a YAML mapping")
         extra_benchmark_keys = set(raw["benchmark"]) - {
-            "scenarios", "policies", "microbatch_sizes", "history_length", "requests"
+            "scenarios", "policies", "microbatch_sizes", "history_length", "requests", "repeats"
         }
         if extra_benchmark_keys:
             raise ValueError(f"invalid benchmark: unknown keys: {', '.join(sorted(extra_benchmark_keys))}")
+        benchmark = raw["benchmark"]
+        for name in ("scenarios", "policies", "microbatch_sizes"):
+            if name in benchmark and (not isinstance(benchmark[name], list) or not benchmark[name]):
+                raise ValueError(f"benchmark.{name} must be a non-empty list")
+        if set(benchmark.get("scenarios", [])) - {
+            "stable", "abrupt", "gradual", "brief_burst", "alternating", "uniform"
+        }:
+            raise ValueError("benchmark.scenarios contains an unsupported scenario")
+        if set(benchmark.get("policies", [])) - {
+            "no_cache", "static", "lru", "decayed_lfu", "adaptive"
+        }:
+            raise ValueError("benchmark.policies contains an unsupported policy")
+        if any(int(size) <= 0 or int(size) > 64 for size in benchmark.get("microbatch_sizes", [])):
+            raise ValueError("benchmark microbatch sizes must be between 1 and 64")
+        if int(benchmark.get("requests", 1)) <= 0 or not 1 <= int(benchmark.get("repeats", 1)) <= 10:
+            raise ValueError("benchmark requests must be positive and repeats must be between 1 and 10")
+        if not 0 <= int(benchmark.get("history_length", 0)) <= 256:
+            raise ValueError("benchmark.history_length must be between 0 and 256")
 
     data = raw["data"]
     cache = raw["cache"]

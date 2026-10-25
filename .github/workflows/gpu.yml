@@ -13,6 +13,17 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install -e '.[dev,service]'
       - run: python scripts/preflight.py --backend cuda
+      - run: python -m hotshift.cli data generate --config configs/smoke.yaml
+      - run: python -m hotshift.cli data catalog --config configs/smoke.yaml
       - run: python -m hotshift.cli build-extension
-      - run: python -m pytest tests/cuda -m cuda
+      - run: python -m pytest tests/cpu tests/integration tests/cuda
       - run: bash scripts/run_sanitizers.sh
+      - run: python -m hotshift.cli bench-cuda --matrix configs/smoke.yaml --smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hotshift-gpu-validation
+          path: |
+            artifacts/runs/**
+            artifacts/sanitizers/**
+          if-no-files-found: ignore

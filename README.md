@@ -34,9 +34,11 @@ python3 -m hotshift.cli bench --matrix configs/smoke.yaml --smoke
 python3 -m hotshift.cli report --runs artifacts/runs
 ```
 
+On an NVIDIA GPU host, run the matched CUDA replay matrix with `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml`. Use `--smoke` for a short functional run. This times the serialized CUDA serving path; compare only runs with matching hardware and workload metadata.
+
 ## CUDA setup
 
-CUDA requires Linux, an NVIDIA driver and GPU, `nvcc`, a compatible host compiler, and a PyTorch build matched to the local CUDA toolkit. Install the appropriate PyTorch wheel for the target host first, then install the project. Inspect `python3 scripts/preflight.py --backend cuda`, build with `python3 -m hotshift.cli build-extension`, run `python3 -m pytest tests/cuda -m cuda`, and run `bash scripts/run_sanitizers.sh`.
+CUDA requires Linux, an NVIDIA driver and GPU, `nvcc`, a compatible host compiler, and a PyTorch build matched to the local CUDA toolkit. Install the appropriate PyTorch wheel for the target host first, then install the project. Inspect `python3 scripts/preflight.py --backend cuda`, build with `python3 -m hotshift.cli build-extension`, run `python3 -m pytest tests/cuda -m cuda`, run `bash scripts/run_sanitizers.sh`, and use `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml` for GPU measurements. The Kaggle setup is documented in [docs/KAGGLE.md](docs/KAGGLE.md).
 
 The GPU engine uses a dense `item_to_slot` map, a fixed-capacity row cache, bounded miss staging, a custom CUDA probe, and a fused custom mean-pooling kernel. The reference path deliberately synchronizes the probe for host miss planning and serializes cache updates. It is not an asynchronous overlapping pipeline. The entire embedding table stays on the CPU.
 

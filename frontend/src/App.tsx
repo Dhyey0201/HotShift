@@ -39,6 +39,7 @@ export default function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [selectedRun, setSelectedRun] = useState("");
   const [comparison, setComparison] = useState<BenchmarkRow[]>([]);
+  const selectedRunInfo = runs.find((run) => run.run_id === selectedRun);
 
   const refresh = useCallback(async () => {
     try {
@@ -242,16 +243,16 @@ export default function App() {
         </section>
       </div>
       <section className="panel comparison-panel">
-        <div className="panel-head"><div><p className="eyebrow">SAVED CPU REPLAYS</p><h2>Policy comparison</h2></div><span className="synthetic-tag">DETERMINISTIC OFFLINE DATA</span></div>
+        <div className="panel-head"><div><p className="eyebrow">SAVED BENCHMARK RUNS</p><h2>Policy comparison</h2></div><span className="synthetic-tag">DETERMINISTIC WORKLOADS</span></div>
         {runs.length ? <>
           <label className="field-label" htmlFor="saved-run">Benchmark run</label>
           <select id="saved-run" value={selectedRun} onChange={(event) => setSelectedRun(event.target.value)}>
             {runs.map((run) => <option key={run.run_id} value={run.run_id}>{run.run_id} · {run.backend} · {run.dataset_version}</option>)}
           </select>
-          <div className="comparison-table-wrap"><table><thead><tr><th>Scenario</th><th>Policy</th><th>Batch</th><th>Occurrence hit</th><th>Throughput</th><th>Batch p50</th></tr></thead>
-            <tbody>{comparison.map((row, index) => <tr key={`${row.scenario}-${row.policy}-${row.batch_size}-${index}`}><td>{row.scenario}</td><td>{row.policy}</td><td>{row.batch_size}</td><td>{percent(row.occurrence_hit_rate)}</td><td>{rate(row.request_throughput, "req/s")}</td><td>{ms(row.batch_engine_ms_p50)}</td></tr>)}</tbody></table></div>
-          <p className="comparison-note">CPU simulator replay results describe hit behavior and CPU execution; they do not predict GPU serving performance.</p>
-        </> : <div className="empty-state"><p>No saved benchmark runs found.</p><small>Run <code>hotshift bench --matrix configs/benchmark.yaml</code> to create a comparison artifact.</small></div>}
+          <div className="comparison-table-wrap"><table><thead><tr><th>Scenario</th><th>Seed</th><th>Policy</th><th>Batch</th><th>Occurrence hit</th><th>Throughput</th><th>Batch p50 ms</th></tr></thead>
+            <tbody>{comparison.map((row, index) => <tr key={`${row.scenario}-${row.seed}-${row.policy}-${row.batch_size}-${index}`}><td>{row.scenario}</td><td>{row.seed ?? "—"}</td><td>{row.policy}</td><td>{row.batch_size}</td><td>{percent(row.occurrence_hit_rate)}</td><td>{rate(row.request_throughput, "req/s")}</td><td>{ms(row.batch_wall_ms_p50 ?? row.batch_engine_ms_p50)}</td></tr>)}</tbody></table></div>
+          <p className="comparison-note">{selectedRunInfo?.backend === "cuda" ? "CUDA batch wall time includes host planning, transfer, synchronization, kernels, and policy maintenance; it is specific to the recorded GPU runtime." : "CPU simulator replay hit rates describe simulated residency and CPU execution; they do not predict GPU serving performance."}</p>
+        </> : <div className="empty-state"><p>No saved benchmark runs found.</p><small>Run <code>hotshift bench</code> for CPU replay or <code>hotshift bench-cuda</code> on an NVIDIA host.</small></div>}
       </section>
       <footer><span>HOTSHIFT <b>·</b> SYSTEMS DEMONSTRATION</span><span>Backend metrics only · synthetic data · no performance claims</span></footer>
     </main>

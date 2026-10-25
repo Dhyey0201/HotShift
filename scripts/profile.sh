@@ -10,5 +10,8 @@ if [[ $# -eq 0 ]]; then
   exit 2
 fi
 mkdir -p artifacts/profiles
-nsys profile --trace=cuda,nvtx,osrt --output="artifacts/profiles/hotshift" \
-  python3 -m hotshift.cli bench "$@"
+python3 -m hotshift.cli preflight --backend cuda
+python3 -m hotshift.cli build-extension
+profile_name="artifacts/profiles/hotshift-$(date -u +%Y%m%dT%H%M%SZ)"
+nsys profile --trace=cuda,nvtx,osrt --output="$profile_name" \
+  python3 -m hotshift.cli bench-cuda "$@"

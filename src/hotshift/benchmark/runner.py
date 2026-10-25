@@ -35,6 +35,8 @@ def run_matrix(matrix_path: str | Path, smoke: bool = False) -> Path:
     batch_sizes = [16] if smoke else benchmark.get("microbatch_sizes", [1, 16, 64])
     request_count = 500 if smoke else int(benchmark.get("requests", 100000))
     trace_history_length = 8 if smoke else int(benchmark.get("history_length", 32))
+    repeats = 1 if smoke else int(benchmark.get("repeats", 3))
+    seeds = [config.seed + index for index in range(repeats)]
     store = EmbeddingStore(config.output_dir)
     output_root = Path(os.getenv("HOTSHIFT_ARTIFACT_DIR", "artifacts")) / "runs"
     output_root.mkdir(parents=True, exist_ok=True)
@@ -48,48 +50,55 @@ def run_matrix(matrix_path: str | Path, smoke: bool = False) -> Path:
     trace_checksums: dict[str, str] = {}
     try:
         for scenario in scenarios:
-            trace_path = traces_dir / f"{scenario}.jsonl"
-            trace_manifest = generate_trace(
-                output_path=trace_path,
-                rows=store.rows,
-                requests=request_count,
-                history_length=trace_history_length,
-                seed=42,
-                scenario=scenario,
-            )
-            trace_checksums[scenario] = str(trace_manifest["trace_sha256"])
-            event_lines.append({"event": "trace_generated", "scenario": scenario, **trace_manifest})
-            for batch_size in batch_sizes:
-                for policy_name in policies:
-                    summary = replay_trace(
-                        trace_path=trace_path,
-                        store=store,
-                        capacity=config.cache_capacity,
-                        policy_name=policy_name,
-                        batch_size=int(batch_size),
-                    )
-                    summary.update({"run_id": run_id, "scenario": scenario, "batch_size": batch_size})
-                    raw_batch_samples.extend(
-                        {
-                            "scenario": scenario,
-                            "policy": policy_name,
-                            "batch_size": batch_size,
-                            "sample_index": index,
-                            "engine_ms": sample,
-                        }
-                        for index, sample in enumerate(summary["batch_engine_samples_ms"])
-                    )
-                    summary.pop("batch_engine_samples_ms")
-                    event_lines.append(
-                        {
-                            "event": "policy_replay_complete",
-                            "scenario": scenario,
-                            "policy": policy_name,
-                            "batch_size": batch_size,
-                            "measured_requests": summary["measured_requests"],
-                        }
-                    )
-                    summaries.append(summary)
+            for seed_index, seed in enumerate(seeds):
+                trace_path = traces_dir / f"{scenario}-seed{seed}.jsonl"
+                trace_manifest = generate_trace(
+                    output_path=trace_path,
+                    rows=store.rows,
+                    requests=request_count,
+                    history_length=trace_history_length,
+                    seed=seed,
+                    scenario=scenario,
+                )
+                trace_key = f"{scenario}-seed{seed}"
+                trace_checksums[trace_key] = str(trace_manifest["trace_sha256"])
+                event_lines.append({"event": "trace_generated", "scenario": scenario, **trace_manifest})
+                for batch_size in batch_sizes:
+                    policy_order = list(policies)
+                    rotation = seed_index % len(policy_order)
+                    policy_order = policy_order[rotation:] + policy_order[:rotation]
+                    for policy_name in policy_order:
+                        summary = replay_trace(
+                            trace_path=trace_path,
+                            store=store,
+                            capacity=config.cache_capacity,
+                            policy_name=policy_name,
+                            batch_size=int(batch_size),
+                        )
+                        summary.update({"run_id": run_id, "scenario": scenario, "seed": seed, "batch_size": batch_size})
+                        raw_batch_samples.extend(
+                            {
+                                "scenario": scenario,
+                                "seed": seed,
+                                "policy": policy_name,
+                                "batch_size": batch_size,
+                                "sample_index": index,
+                                "engine_ms": sample,
+                            }
+                            for index, sample in enumerate(summary["batch_engine_samples_ms"])
+                        )
+                        summary.pop("batch_engine_samples_ms")
+                        event_lines.append(
+                            {
+                                "event": "policy_replay_complete",
+                                "scenario": scenario,
+                                "seed": seed,
+                                "policy": policy_name,
+                                "batch_size": batch_size,
+                                "measured_requests": summary["measured_requests"],
+                            }
+                        )
+                        summaries.append(summary)
         manifest = {
             "schema_version": 1,
             "run_id": run_id,
@@ -128,6 +137,7 @@ def run_matrix(matrix_path: str | Path, smoke: bool = False) -> Path:
                 "window_index",
                 "window_scope",
                 "scenario",
+                "seed",
                 "policy",
                 "batch_size",
                 "occurrence_hit_rate",
@@ -143,7 +153,7 @@ def run_matrix(matrix_path: str | Path, smoke: bool = False) -> Path:
                 row["window_scope"] = "entire_measured_evaluation_trace"
                 writer.writerow(row)
         with (temporary / "batch_samples.csv").open("w", newline="", encoding="utf-8") as stream:
-            columns = ["scenario", "policy", "batch_size", "sample_index", "engine_ms"]
+            columns = ["scenario", "seed", "policy", "batch_size", "sample_index", "engine_ms"]
             writer = csv.DictWriter(stream, fieldnames=columns)
             writer.writeheader()
             writer.writerows(raw_batch_samples)

@@ -57,6 +57,9 @@ def main(argv: list[str] | None = None) -> int:
     bench_parser = commands.add_parser("bench", help="replay benchmark policies on CPU")
     bench_parser.add_argument("--matrix", required=True)
     bench_parser.add_argument("--smoke", action="store_true")
+    cuda_bench_parser = commands.add_parser("bench-cuda", help="benchmark serialized cache execution on CUDA")
+    cuda_bench_parser.add_argument("--matrix", required=True)
+    cuda_bench_parser.add_argument("--smoke", action="store_true")
     report_parser = commands.add_parser("report", help="summarize completed local runs")
     report_parser.add_argument("--runs", default="artifacts/runs")
     report_parser.add_argument("--output")
@@ -107,6 +110,10 @@ def main(argv: list[str] | None = None) -> int:
             from hotshift.benchmark.runner import run_matrix
 
             print(run_matrix(args.matrix, smoke=args.smoke))
+        elif args.command == "bench-cuda":
+            from hotshift.benchmark.cuda_runner import run_cuda_matrix
+
+            print(run_cuda_matrix(args.matrix, smoke=args.smoke))
         elif args.command == "report":
             from hotshift.benchmark.report import write_report
 

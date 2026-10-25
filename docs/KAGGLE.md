@@ -1,6 +1,6 @@
 # Run HotShift CUDA checks in Kaggle
 
-In Kaggle, create a Python notebook, enable **Internet**, and select **GPU** under **Settings → Session options → Accelerator**. Then copy the entire Python block below into one code cell and run it. It clones HotShift from GitHub, checks for a GPU and `nvcc`, builds the CUDA extension, and runs the CUDA tests. If the cell reports that `github.com` cannot be resolved, turn Internet on in the notebook settings, restart the session, and rerun the cell.
+In Kaggle, create a Python notebook, enable **Internet**, and select **GPU** under **Settings → Session options → Accelerator**. Then copy the entire Python block below into one code cell and run it. It clones or updates HotShift from GitHub, checks for a GPU and `nvcc`, builds the CUDA extension, runs CUDA/cache/API tests, creates a short CUDA benchmark artifact, and runs Compute Sanitizer when available. If the cell reports that `github.com` cannot be resolved, turn Internet on in the notebook settings, restart the session, and rerun the cell.
 
 ```python
 import os
@@ -45,7 +45,8 @@ run(sys.executable, "scripts/preflight.py", "--backend", "cuda")
 run(sys.executable, "-m", "hotshift.cli", "data", "generate", "--config", "configs/smoke.yaml")
 run(sys.executable, "-m", "hotshift.cli", "data", "catalog", "--config", "configs/smoke.yaml")
 run(sys.executable, "-m", "hotshift.cli", "build-extension")
-run(sys.executable, "-m", "pytest", "tests/cuda", "-m", "cuda", "-q")
+run(sys.executable, "-m", "pytest", "tests/cpu", "tests/integration", "tests/cuda", "-q")
+run(sys.executable, "-m", "hotshift.cli", "bench-cuda", "--matrix", "configs/smoke.yaml", "--smoke")
 
 if shutil.which("compute-sanitizer"):
     run("bash", "scripts/run_sanitizers.sh")
@@ -53,4 +54,4 @@ else:
     print("SKIPPED: Compute Sanitizer is not installed in this Kaggle image.")
 ```
 
-Kaggle GPU availability and installed tools vary. If the cell reports that `nvcc` is missing, this runtime cannot compile the CUDA extension. The current `hotshift bench` command is CPU replay only and does not produce GPU performance measurements.
+Kaggle GPU availability and installed tools vary. If the cell reports that `nvcc` is missing, this runtime cannot compile the CUDA extension. The short `bench-cuda --smoke` run is functional evidence only; use `configs/benchmark.yaml` for the full repeated matrix. `hotshift bench` remains CPU replay only.

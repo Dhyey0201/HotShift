@@ -9,6 +9,7 @@ import numpy as np
 from hotshift.data.store import EmbeddingStore
 from hotshift.engine.cpu import pool_mean_reference
 from hotshift.policies.base import CachePolicy
+from hotshift.policies.static import StaticPolicy
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,8 @@ class CPUCacheEngine:
         self.capacity = capacity
         self.policy = policy
         self.resident: set[int] = set()
+        if isinstance(policy, StaticPolicy):
+            self.resident = set(policy.warm_items[:capacity])
         self.generation = 0
         self.healthy = True
 
@@ -83,6 +86,8 @@ class CPUCacheEngine:
         self.policy.reset()
         if policy is not None:
             self.policy = policy
+        if isinstance(self.policy, StaticPolicy):
+            self.resident = set(self.policy.warm_items[: self.capacity])
         self.generation += 1
 
     def status(self) -> dict[str, object]:

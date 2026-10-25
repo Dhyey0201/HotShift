@@ -18,4 +18,6 @@ benchmark:
   policies: [no_cache, static, lru, decayed_lfu, adaptive]
   microbatch_sizes: [1, 16, 64]
   history_length: 32
+  requests: 100000
+  repeats: 3
 

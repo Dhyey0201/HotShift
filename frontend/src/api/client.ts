@@ -28,7 +28,7 @@ export type Metrics = {
 
 export type Recommendation = { item_id: number; title: string; artist: string; genre: string; score: number };
 export type RunListItem = { run_id: string; status: string; backend?: string; dataset_version?: string; summary_count?: number; timestamp_utc?: string };
-export type BenchmarkRow = { scenario: string; policy: string; batch_size: number; occurrence_hit_rate: number | null; unique_hit_rate: number | null; request_throughput: number | null; batch_engine_ms_p50: number | null; host_miss_bytes: number };
+export type BenchmarkRow = { backend?: string; scenario: string; seed?: number; policy: string; batch_size: number; occurrence_hit_rate: number | null; unique_hit_rate: number | null; request_throughput: number | null; batch_engine_ms_p50?: number | null; batch_wall_ms_p50?: number | null; host_miss_bytes: number };
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {

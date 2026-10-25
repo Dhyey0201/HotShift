@@ -10,6 +10,7 @@ import numpy as np
 from hotshift.data.store import EmbeddingStore
 from hotshift.engine.base import BatchResult
 from hotshift.policies.base import CachePolicy
+from hotshift.policies.static import StaticPolicy
 
 ROOT = Path(__file__).resolve().parents[3]
 SOURCES = [
@@ -71,7 +72,19 @@ class CUDACacheEngine:
         self.resident: set[int] = set()
         self.generation = 0
         self.healthy = True
+        if isinstance(policy, StaticPolicy):
+            self._preload_static()
         torch.cuda.synchronize(self.device)
+
+    def _preload_static(self) -> None:
+        items = list(self.policy.warm_items[: self.capacity])
+        if not items:
+            return
+        rows = np.ascontiguousarray(self.store.table[np.asarray(items, dtype=np.int64)])
+        self.cache_rows[: len(items)].copy_(self.torch.as_tensor(rows, device=self.device))
+        self.policy_mapping_update([-1] * len(items), items, list(range(len(items))))
+        self.slot_to_item[: len(items)] = items
+        self.resident = set(items)
 
     def pool(self, histories: Sequence[Sequence[int]]) -> BatchResult:
         torch = self.torch
@@ -172,6 +185,8 @@ class CUDACacheEngine:
         self.policy.reset()
         if policy is not None:
             self.policy = policy
+        if isinstance(self.policy, StaticPolicy):
+            self._preload_static()
         self.generation += 1
 
     def status(self) -> dict[str, object]:

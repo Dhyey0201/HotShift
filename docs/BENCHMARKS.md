@@ -2,7 +2,7 @@
 
 ## Current evidence
 
-There are no measured GPU results. CPU replay runs the numerical reference and policy simulator; cache hit rates describe simulated residency. CPU timings are not GPU kernel timings, and CPU cache policy hit rate does not imply latency improvement. The dashboard labels CPU source-miss bytes as an estimate.
+CUDA operators have been built and tested on a user-provided Kaggle runtime, including Compute Sanitizer. No GPU benchmark results have been collected yet. CPU replay runs the numerical reference and policy simulator; CPU timings are not GPU timings, and hit rate alone does not establish latency improvement. The dashboard labels CPU source-miss bytes as an estimate.
 
 ## Reproducible CPU replay
 
@@ -12,7 +12,9 @@ The smoke matrix is functional evidence only. Larger CPU replays are useful for 
 
 ## GPU protocol still required
 
-Compare CPU PyTorch reference, no-cache transfer, static, LRU, decayed frequency, adaptive, and full GPU-resident reference. Use identical immutable data, traces, batch partitions, initial cache state, and declared memory budgets. Measure host end-to-end time and CUDA event spans separately; include miss planning, synchronization, policy work, maintenance, and cache preload. Report transfer payloads, device memory, successful requests, dispatch lag, errors, p50/p95/p99 sample counts, and each run. Repeat at least three times with fixed seeds and rotate policy order.
+The CUDA runner is `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml`; use `--smoke` first. It records deterministic trace hashes, repeated seeds, rotated policy order, cache hit rates, host batch wall time, CUDA event spans, miss payload bytes, peak device allocations, and GPU/toolchain metadata. Its request throughput divides measured requests by the sum of measured batch wall times, excluding trace file parsing and gaps between batches; it describes serialized active-batch capacity, not offered-load service throughput. Nsight Systems can profile this path with `bash scripts/profile.sh --matrix configs/smoke.yaml --smoke`.
 
-Required initial profiles cover stable, abrupt, brief-burst, and uniform traffic at microbatches 1/16/64, then a targeted capacity/dimension/load matrix. Preserve workloads in which caching loses or provides little benefit. There is no required speedup. GPU reports remain blocked until the extension executes on a real NVIDIA GPU and sanitizer findings are resolved.
+Validate the runner and artifact schema on Kaggle before starting a full matrix. The initial runner compares no-cache, static, LRU, decayed-LFU, and adaptive cache modes. A separately implemented CPU or full GPU-resident reference baseline and service load benchmark remain follow-up work. Use identical immutable data, traces, batch partitions, initial cache state, and declared memory budgets when adding baselines. CUDA event intervals are not pure kernel time: they can include device idle gaps, while batch wall time includes host planning, transfer, synchronization, kernels, and policy maintenance. The implementation is serialized and does not overlap host planning with GPU work.
+
+Required initial profiles cover stable, abrupt, brief-burst, and uniform traffic at microbatches 1/16/64 with at least three seeds, then a targeted capacity/dimension/load matrix. Preserve workloads in which caching loses or provides little benefit. There is no required speedup. Do not publish performance claims until smoke and full matrices are reviewed, correctness is maintained, and Nsight captures explain the measured behavior.
 

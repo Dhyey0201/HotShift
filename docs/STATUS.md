@@ -13,12 +13,13 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 - FastAPI schemas/routes, bounded batching, queue limits, deadlines, cancellation, exclusive controls, recommendations, scenarios, status, and metrics.
 - React/Vite dashboard with backend badge, real metrics polling, music demo, scenario/policy controls, and charts.
 - C++/CUDA custom probe, gather, fused pooling, mapping update kernels, and a Python CUDA cache engine.
+- CUDA cache engine static preloading, reset, cache lifecycle/API tests, and a repeated CUDA benchmark runner are implemented; GPU-only additions await rerun on Kaggle.
 - CPU, integration, CUDA, frontend unit, and Playwright test sources; CI workflows; CPU Docker Compose; sanitizer/profile/release scripts.
 
 ## Not yet proven or incomplete
 
-- End-to-end `CUDACacheEngine` state/admission behavior and CUDA-backed API serving have not been validated by the reported operator test run.
-- Nsight captures and GPU performance benchmark evidence do not exist. The existing benchmark command is CPU replay only.
+- New end-to-end `CUDACacheEngine` state/admission tests and CUDA-backed API tests have not yet been run on a GPU.
+- CUDA benchmark runner and Nsight profile path are implemented but have not yet been run; no GPU performance results exist.
 - Docker image and Compose flow have not been validated in this environment.
 - External baseline adapters and a license decision remain outstanding. A license must be selected by the project owner before code reuse is authorized.
 
@@ -28,25 +29,26 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 | --- | --- | --- | --- |
 | R01 | Correct mean pooling | validated for tested operator cases | CPU reference plus CUDA pooling tests passed on Kaggle, including awkward dimensions and empty histories |
 | R02 | Custom CUDA operations | validated for tested operators | Extension build succeeded; 6 CUDA tests passed; Compute Sanitizer reported zero errors/hazards |
-| R03 | Bounded GPU cache | partial | CUDA engine implemented; end-to-end residency, admission, and eviction tests still needed |
-| R04 | Safe slot reuse | partial | Sanitizers passed on operator tests; cache replacement and lifetime stress not yet demonstrated |
+| R03 | Bounded GPU cache | partial | Engine and lifecycle tests implemented; rerun the new engine tests on Kaggle |
+| R04 | Safe slot reuse | partial | Sanitizers passed on operators; rerun against new cache replacement tests |
 | R05 | Adaptive behavior | implemented on CPU | Policy and deterministic shift tests pass; GPU deployment unverified |
-| R06 | Fair comparison | partial | Deterministic CPU replay and run artifacts; formal GPU matrix absent |
+| R06 | Fair comparison | partial | CPU/GPU replay runners and repeated trace matrix implemented; GPU matrix and additional reference baselines remain |
 | R07 | Bounded serving | implemented on CPU | CPU API integration tests pass; CUDA-backed API path not yet exercised |
 | R08 | Live dashboard | implemented | Frontend tests/build and Playwright journey pass |
-| R09 | Reproducible build | partial | Python/frontend dependencies and CPU validation pass; Docker and CUDA builds unverified |
+| R09 | Reproducible build | partial | CPU/frontend validation and CUDA extension build pass; Docker image/Compose execution remains unverified |
 | R10 | Performance explanation | blocked | Requires actual Nsight captures and measurements |
 | R11 | Honest reporting | implemented | CPU/GPU limits and unverified GPU evidence are called out |
 | R12 | Usable handoff | partial | Guides and commands present; owner license decision and CUDA release gate remain |
 
 ## Validation performed
 
-- `pytest tests/cpu tests/integration -q`: 16 passed.
+- `pytest tests/cpu tests/integration -q`: 17 passed on the latest local run.
 - `ruff check src tests scripts`: passed.
 - `npm run test --prefix frontend`: 2 passed; `npm run build --prefix frontend`: passed (Vite reports a large bundle warning).
 - `npm run test:e2e --prefix frontend`: 1 passed.
 - CPU smoke benchmark generated a run directory under `artifacts/runs/` with manifest, summary, trace, CSVs, events, and checksums.
 - User-reported Kaggle CUDA run: `build-extension` succeeded; `pytest tests/cuda -m cuda -q` passed 6 tests; Compute Sanitizer memcheck, initcheck, and synccheck each reported 0 errors, while racecheck reported 0 hazards. GPU model and versions were not captured.
+- Local follow-up: 17 CPU/API tests pass; 3 CUDA modules are skipped locally because PyTorch/CUDA is unavailable. Ruff, Python compile checks, CPU smoke benchmark, dashboard build, and Playwright pass.
 - Local preflight remains blocked because this Apple Silicon host lacks an NVIDIA GPU, CUDA toolkit, and CUDA-enabled PyTorch runtime.
 
 ## Next commands
@@ -60,4 +62,4 @@ npm install --prefix frontend
 npm run test --prefix frontend && npm run build --prefix frontend
 ```
 
-Next, capture the Kaggle GPU/toolchain versions, add and run end-to-end CUDA cache/service tests, and implement/collect the GPU benchmark and Nsight evidence described in `docs/BENCHMARKS.md`. Run `python3 scripts/release_check.py` on the owner’s supported environment. No assistant attribution has been added.
+Next, pull the latest `main` in Kaggle and rerun `docs/KAGGLE.md`. This now includes end-to-end cache/API tests and a CUDA smoke benchmark. Capture the GPU/toolchain versions, inspect the artifact, then run the full repeated matrix and Nsight profile. Run `python3 scripts/release_check.py` on the owner’s supported environment. No assistant attribution has been added.
