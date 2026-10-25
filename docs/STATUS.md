@@ -47,7 +47,7 @@ CPU product path and CUDA source are implemented. Local CPU/API, dashboard unit/
 - `npm run test --prefix frontend`: 2 passed; `npm run build --prefix frontend`: passed (Vite reports a large bundle warning).
 - `npm run test:e2e --prefix frontend`: 1 passed.
 - CPU smoke benchmark generated a run directory under `artifacts/runs/` with manifest, summary, trace, CSVs, events, and checksums.
-- User-reported Kaggle validation: Tesla T4, Python 3.13.15, PyTorch 2.11.0+cu128, CUDA toolkit 12.8.93; extension build succeeded; all 27 tests passed; each sanitizer tool passed 10 CUDA tests with zero errors/hazards; CUDA smoke artifacts `20261025T050501Z-cuda-cc1c7439` and `20261025T060823Z-cuda-925bdad4` were generated. `ncu` reported `ERR_NVGPUCTRPERM`; `nsys` is absent.
+- User-reported Kaggle validation: Tesla T4, Python 3.13.15, PyTorch 2.11.0+cu128, CUDA toolkit 12.8.93; extension build succeeded; all 27 tests passed; each sanitizer tool passed 10 CUDA tests with zero errors/hazards; CUDA smoke artifacts `20261025T050501Z-cuda-cc1c7439`, `20261025T060823Z-cuda-925bdad4`, and `20261025T060833Z-cuda-b7331bd0` were generated. `ncu` reported `ERR_NVGPUCTRPERM`; `nsys` is absent.
 - Local follow-up: 17 CPU/API tests pass; 3 CUDA modules are skipped locally because PyTorch/CUDA is unavailable. Ruff, Python compile checks, CPU smoke benchmark, dashboard build, and Playwright pass.
 - Local preflight remains blocked because this Apple Silicon host lacks an NVIDIA GPU, CUDA toolkit, and CUDA-enabled PyTorch runtime.
 
