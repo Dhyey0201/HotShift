@@ -149,13 +149,18 @@ class BatchScheduler:
         token_count = len(first.history)
         flush_at = first.enqueued_at + self.max_batch_delay
         while len(batch) < self.max_batch_requests and token_count < self.max_batch_ids:
-            remaining = flush_at - monotonic()
-            if remaining <= 0:
-                break
+            # Requests already queued always join; the delay only bounds waiting for new ones.
+            # Under a backlog the oldest request is past its delay, yet the batch still fills.
             try:
-                candidate = await asyncio.wait_for(self.queue.get(), timeout=remaining)
-            except TimeoutError:
-                break
+                candidate = self.queue.get_nowait()
+            except asyncio.QueueEmpty:
+                remaining = flush_at - monotonic()
+                if remaining <= 0:
+                    break
+                try:
+                    candidate = await asyncio.wait_for(self.queue.get(), timeout=remaining)
+                except TimeoutError:
+                    break
             if token_count + len(candidate.history) > self.max_batch_ids:
                 self._pending = candidate
                 break

@@ -252,3 +252,23 @@ def test_graceful_shutdown_cancels_work_beyond_the_drain_timeout():
 
     run(exercise())
     assert [history[0] for batch in engine.batches for history in batch] == [1]
+
+
+def test_backlog_fills_batches_even_after_the_delay_expired():
+    """Regression: a backlog older than max_batch_delay must still batch, not run one by one."""
+    engine = FakeEngine()
+    engine.release.clear()
+
+    async def exercise():
+        scheduler = BatchScheduler(engine, queue_capacity=64, max_batch_requests=8, max_batch_delay_ms=1)
+        await scheduler.start()
+        blocker = asyncio.create_task(scheduler.submit([0], 5000))
+        await asyncio.sleep(0.05)
+        backlog = [asyncio.create_task(scheduler.submit([index], 5000)) for index in range(1, 25)]
+        await asyncio.sleep(0.05)  # every queued request is now far older than the 1 ms delay
+        engine.release.set()
+        await asyncio.gather(blocker, *backlog)
+        await scheduler.close()
+
+    run(exercise())
+    assert [len(batch) for batch in engine.batches] == [1, 8, 8, 8]
