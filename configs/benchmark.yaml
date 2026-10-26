@@ -16,8 +16,11 @@ limits:
 benchmark:
   scenarios: [stable, abrupt, brief_burst, uniform]
   policies: [no_cache, static, lru, decayed_lfu, adaptive]
+  baselines: [torch_cpu, torch_gpu_resident]
   microbatch_sizes: [1, 16, 64]
   history_length: 32
   requests: 100000
   repeats: 3
+  cache_conditions: [warm]
+  verify_every: 50
 

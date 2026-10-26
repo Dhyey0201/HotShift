@@ -46,6 +46,8 @@ torch::Tensor gather_rows_cuda(
     TORCH_CHECK(cache_rows.dim() == 2 && miss_rows.dim() == 2 && source_index.dim() == 1,
         "gather input dimensions are invalid");
     TORCH_CHECK(cache_rows.size(1) == miss_rows.size(1), "row buffer dimensions differ");
+    TORCH_CHECK(!cache_rows.requires_grad() && !miss_rows.requires_grad(),
+        "hotshift::gather_rows is inference-only and does not support gradients");
     TORCH_CHECK(cache_rows.is_contiguous() && miss_rows.is_contiguous() && source_index.is_contiguous(),
         "gather inputs must be contiguous");
     const int64_t dimensions = cache_rows.size(1);

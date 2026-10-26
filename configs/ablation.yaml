@@ -1,0 +1,25 @@
+# Optimization ablation (Milestone 8): preserved baseline paths vs the optimized engine.
+profile: ablation
+data:
+  rows: 1000000
+  dimensions: 128
+  seed: 42
+  output_dir: artifacts/data/standard
+cache:
+  capacity: 100000
+  policy: adaptive
+limits:
+  max_history_ids: 256
+  max_batch_requests: 64
+  max_batch_ids: 16384
+  queue_capacity: 1024
+  max_batch_delay_ms: 2.0
+benchmark:
+  scenarios: [abrupt]
+  policies: [lru, adaptive]
+  baselines: []
+  microbatch_sizes: [1, 64]
+  engine_variants: [optimized, pageable_staging, host_admission]
+  history_length: 32
+  requests: 30000
+  repeats: 3

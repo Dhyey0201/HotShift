@@ -30,25 +30,36 @@ class CatalogScorer:
                 raise ValueError(f"catalog checksum mismatch: {filename}")
         self.manifest = manifest
 
-    def recommend(self, vector: np.ndarray, history: list[int], top_k: int, exclude_seen: bool) -> list[dict[str, Any]]:
+    def recommend(
+        self, vector: np.ndarray, history: list[int], top_k: int, exclude_seen: bool
+    ) -> tuple[list[dict[str, Any]], str]:
+        """Rank the bounded candidate set by dot product with the normalized history vector.
+
+        Ties break by item ID. An empty history (or a zero pooled vector) uses the documented
+        deterministic popularity fallback: the synthetic catalog designates lower candidate
+        IDs as more popular, so candidates rank by ascending ID with score 0. Fewer than
+        ``top_k`` items are returned when not enough candidates remain eligible.
+        """
         if vector.shape != (self.embeddings.shape[1],):
             raise ValueError("history and catalog embedding dimensions differ")
         norm = float(np.linalg.norm(vector))
-        if norm > 0:
-            normalized = vector / norm
-            candidate_scores = np.asarray(self.embeddings[self.candidate_ids] @ normalized, dtype=np.float32)
-        else:
-            candidate_scores = np.zeros(len(self.candidate_ids), dtype=np.float32)
         candidates = np.asarray(self.candidate_ids, dtype=np.int64)
+        if history and norm > 0:
+            ranking = "similarity"
+            candidate_scores = np.asarray(self.embeddings[candidates] @ (vector / norm), dtype=np.float32)
+        else:
+            ranking = "popularity_fallback"
+            candidate_scores = np.zeros(len(candidates), dtype=np.float32)
         if exclude_seen and history:
             keep = ~np.isin(candidates, np.asarray(history, dtype=np.int64))
             candidates = candidates[keep]
             candidate_scores = candidate_scores[keep]
         ordering = np.lexsort((candidates, -candidate_scores))
-        return [
+        items = [
             {"item_id": int(candidates[index]), "score": float(candidate_scores[index]), **self.items[int(candidates[index])]}
             for index in ordering[:top_k]
         ]
+        return items, ranking
 
     @staticmethod
     def _sha256(path: Path) -> str:

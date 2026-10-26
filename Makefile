@@ -1,30 +1,45 @@
-.PHONY: setup-check data-smoke test-cpu test-cuda api ui bench-smoke sanitize release-check
+.PHONY: setup-check data-smoke test-cpu test-cuda lint api ui bench-smoke bench-cuda-smoke bench-gpu-evidence sanitize profile release-check
+
+PYTHON ?= python3
 
 setup-check:
-	python3 scripts/preflight.py --backend cpu
+	$(PYTHON) scripts/preflight.py --backend cpu
 
 data-smoke:
-	python3 -m hotshift.cli data generate --config configs/smoke.yaml
-	python3 -m hotshift.cli test-reference --config configs/smoke.yaml
+	$(PYTHON) -m hotshift.cli data generate --config configs/smoke.yaml --if-missing
+	$(PYTHON) -m hotshift.cli data catalog --config configs/smoke.yaml
+	$(PYTHON) -m hotshift.cli test-reference --config configs/smoke.yaml
+
+lint:
+	$(PYTHON) -m ruff check src tests scripts
 
 test-cpu:
-	python3 -m pytest tests/cpu tests/integration -m 'cpu or integration'
+	$(PYTHON) -m pytest tests/cpu tests/integration -m 'cpu or integration'
 
 test-cuda:
-	python3 -m pytest tests/cuda -m cuda
+	HOTSHIFT_REQUIRE_CUDA=1 $(PYTHON) -m pytest tests/cuda -m cuda
 
 api:
-	python3 -m hotshift.cli serve --config configs/smoke.yaml --backend cpu
+	$(PYTHON) -m hotshift.cli serve --config configs/smoke.yaml --backend cpu
 
 ui:
-	cd frontend && npm run dev
+	npm run dev --prefix frontend
 
 bench-smoke:
-	python3 -m hotshift.cli bench --matrix configs/benchmark.yaml --smoke
+	$(PYTHON) -m hotshift.cli bench --matrix configs/smoke.yaml --smoke
+
+bench-cuda-smoke:
+	$(PYTHON) -m hotshift.cli bench-cuda --matrix configs/smoke.yaml --smoke
+
+# Full GPU evidence set: standard matrix, sweeps, kernels, profiler capture, report.
+bench-gpu-evidence:
+	bash scripts/gpu_evidence.sh
 
 sanitize:
 	bash scripts/run_sanitizers.sh
 
-release-check:
-	python3 scripts/release_check.py
+profile:
+	bash scripts/profile.sh --matrix configs/smoke.yaml --smoke
 
+release-check:
+	$(PYTHON) scripts/release_check.py

@@ -1,29 +1,60 @@
+# Convenience stack for the API and dashboard. The default "cpu" profile needs no GPU.
+# `docker compose --profile gpu up` uses the CUDA image; the NVIDIA driver and Container
+# Toolkit remain host prerequisites. Ports bind to localhost because the demo controls are
+# unauthenticated.
 services:
   api:
+    profiles: ["cpu"]
     build: .
     environment:
       HOTSHIFT_BACKEND: cpu
-      HOTSHIFT_CONFIG: configs/demo.yaml
-      HOTSHIFT_DATA_DIR: /app/artifacts/data/demo
+      HOTSHIFT_CONFIG: ${HOTSHIFT_CONFIG:-configs/smoke.yaml}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
       - ./artifacts:/app/artifacts
+    stop_grace_period: 15s
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"]
       interval: 10s
       timeout: 3s
-      retries: 5
+      start_period: 60s
+      retries: 6
+  api-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+    environment:
+      HOTSHIFT_BACKEND: cuda
+      HOTSHIFT_CONFIG: ${HOTSHIFT_CONFIG:-configs/demo.yaml}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./artifacts:/app/artifacts
+    stop_grace_period: 15s
+    networks:
+      default:
+        aliases: [api]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
   frontend:
-    image: node:22-alpine
+    profiles: ["cpu", "gpu"]
+    image: node@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
     working_dir: /workspace/frontend
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm ci && npx vite --host 0.0.0.0 --port 5173"
     environment:
       HOTSHIFT_API_PROXY: http://api:8000
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
       - ./frontend:/workspace/frontend
-    depends_on:
-      api:
-        condition: service_healthy
+      # Keep Linux node_modules out of the host checkout.
+      - frontend_node_modules:/workspace/frontend/node_modules
+volumes:
+  frontend_node_modules:

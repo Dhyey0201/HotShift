@@ -91,17 +91,23 @@ def preflight(backend: str = "cpu", config_path: str | None = None) -> dict[str,
             from hotshift.config import load_config
 
             config = load_config(selected_config)
+            # Mirrors CUDABuffers: per-ID ids/slots/source/inverse plus maintenance keys, sources,
+            # and slots; worst-case miss rows; offsets and outputs. Allocator slack is extra.
+            per_id_bytes = 8 + 4 + 4 + 8 + 4 + 8 + 8 + 8
             device_estimate = (
                 config.cache_bytes
                 + config.rows * 4
-                + config.cache_capacity * 8
-                + config.max_batch_ids * config.dimensions * 4
+                + config.max_batch_ids * (per_id_bytes + config.dimensions * 4)
+                + (config.max_batch_requests + 1) * 8
                 + config.max_batch_requests * config.dimensions * 4
             )
+            # Host: table, matching pinned staging, CPU slot mirror, and policy dictionaries
+            # (roughly 120 bytes per scored item for the frequency policies).
             host_estimate = (
                 config.table_bytes
-                + config.rows * 16
-                + config.max_batch_ids * config.dimensions * 4
+                + config.max_batch_ids * (per_id_bytes + config.dimensions * 4)
+                + config.cache_capacity * 8
+                + config.rows * 120
                 + config.queue_capacity * config.max_history_ids * 8
             )
             overridden = os.getenv("HOTSHIFT_ALLOW_OVERCAPACITY") == "1"
@@ -122,3 +128,51 @@ def preflight(backend: str = "cpu", config_path: str | None = None) -> dict[str,
             result["capacity_estimate"] = {"status": "invalid", "reason": str(error)}
     return result
 
+
+
+_KERNEL_PROBE = (
+    "import torch;from hotshift.engine.cuda import build_cuda_extension;build_cuda_extension();"
+    "m=torch.tensor([-1,0],dtype=torch.int32,device='cuda');"
+    "r=torch.ops.hotshift.probe_slots(torch.tensor([0,1,5],device='cuda'),m).cpu().tolist();"
+    "assert r==[-1,0,-1],r;print('kernel-ok')"
+)
+
+
+def deep_checks(timeout: float = 600.0) -> dict[str, Any]:
+    """Compile the extension, execute one owned kernel, and test profiler counter access.
+
+    Profiling status is one of ``available``, ``restricted`` (tools present but counters
+    denied, e.g. ERR_NVGPUCTRPERM), or ``unavailable`` (tools missing).
+    """
+    result: dict[str, Any] = {}
+    try:
+        kernel = subprocess.run([sys.executable, "-c", _KERNEL_PROBE], capture_output=True, text=True, timeout=timeout, check=False)
+        result["extension_kernel"] = "ok" if "kernel-ok" in kernel.stdout else "failed"
+        if result["extension_kernel"] != "ok":
+            result["extension_error"] = (kernel.stderr or kernel.stdout)[-2000:]
+    except subprocess.TimeoutExpired:
+        result["extension_kernel"] = "timeout"
+    ncu = shutil.which("ncu")
+    if ncu is None:
+        result["counter_profiling"] = "unavailable"
+        result["counter_profiling_reason"] = "ncu not installed"
+        return result
+    try:
+        probe = subprocess.run(
+            [ncu, "--metrics", "sm__cycles_elapsed.avg", "--launch-count", "1", sys.executable, "-c",
+             "import torch;torch.ones(8,device='cuda').sum().item()"],
+            capture_output=True, text=True, timeout=timeout, check=False,
+        )
+        output = probe.stdout + probe.stderr
+        if "ERR_NVGPUCTRPERM" in output:
+            result["counter_profiling"] = "restricted"
+            result["counter_profiling_reason"] = "ERR_NVGPUCTRPERM: the host denies GPU performance counters"
+        elif probe.returncode == 0 and "sm__cycles_elapsed" in output:
+            result["counter_profiling"] = "available"
+        else:
+            result["counter_profiling"] = "failed"
+            result["counter_profiling_reason"] = output[-1000:]
+    except subprocess.TimeoutExpired:
+        result["counter_profiling"] = "timeout"
+    result["timeline_profiling"] = "nsys available" if shutil.which("nsys") else "nsys unavailable; use hotshift profile-torch (CUPTI tracing)"
+    return result

@@ -43,6 +43,54 @@ def _require_keys(value: dict[str, Any], expected: set[str], path: str) -> None:
         raise ValueError(f"invalid {path}: {'; '.join(details)}")
 
 
+SCENARIO_NAMES = (
+    "stable", "abrupt", "gradual", "brief_burst", "alternating", "uniform", "mixed_regions", "overload",
+)
+POLICY_NAMES = ("no_cache", "static", "lru", "decayed_lfu", "adaptive")
+BASELINE_NAMES = ("torch_cpu", "torch_gpu_resident")
+ENGINE_VARIANTS = ("optimized", "pageable_staging", "host_admission")
+BENCHMARK_KEYS = {
+    "scenarios", "policies", "baselines", "microbatch_sizes", "history_length", "requests", "repeats",
+    "cache_fractions", "cache_conditions", "window_requests", "engine_variants", "verify_every",
+}
+
+
+def _check_list(benchmark: dict[str, Any], name: str, allowed: tuple[str, ...], allow_empty: bool = False) -> None:
+    if name not in benchmark:
+        return
+    values = benchmark[name]
+    if not isinstance(values, list) or (not values and not allow_empty):
+        raise ValueError(f"benchmark.{name} must be a non-empty list")
+    unknown = set(values) - set(allowed)
+    if unknown:
+        raise ValueError(f"benchmark.{name} contains unsupported values: {', '.join(sorted(map(str, unknown)))}")
+
+
+def validate_benchmark(benchmark: Any) -> None:
+    if not isinstance(benchmark, dict):
+        raise TypeError("benchmark must be a YAML mapping")
+    extra = set(benchmark) - BENCHMARK_KEYS
+    if extra:
+        raise ValueError(f"invalid benchmark: unknown keys: {', '.join(sorted(extra))}")
+    _check_list(benchmark, "scenarios", SCENARIO_NAMES)
+    _check_list(benchmark, "policies", POLICY_NAMES)
+    _check_list(benchmark, "baselines", BASELINE_NAMES, allow_empty=True)
+    _check_list(benchmark, "cache_conditions", ("warm", "cold"))
+    _check_list(benchmark, "engine_variants", ENGINE_VARIANTS)
+    sizes = benchmark.get("microbatch_sizes", [1])
+    if not isinstance(sizes, list) or not sizes or any(int(size) <= 0 or int(size) > 64 for size in sizes):
+        raise ValueError("benchmark microbatch sizes must be a non-empty list of values between 1 and 64")
+    fractions = benchmark.get("cache_fractions", [0.1])
+    if not isinstance(fractions, list) or not fractions or any(not 0 < float(value) <= 1 for value in fractions):
+        raise ValueError("benchmark.cache_fractions must contain values in (0, 1]")
+    if int(benchmark.get("requests", 1)) <= 0 or not 1 <= int(benchmark.get("repeats", 1)) <= 10:
+        raise ValueError("benchmark requests must be positive and repeats must be between 1 and 10")
+    if not 0 <= int(benchmark.get("history_length", 0)) <= 256:
+        raise ValueError("benchmark.history_length must be between 0 and 256")
+    if int(benchmark.get("window_requests", 1)) <= 0 or int(benchmark.get("verify_every", 0)) < 0:
+        raise ValueError("benchmark.window_requests must be positive and verify_every nonnegative")
+
+
 def load_config(path: str | Path) -> HotShiftConfig:
     config_path = Path(path)
     with config_path.open("r", encoding="utf-8") as stream:
@@ -76,31 +124,7 @@ def load_config(path: str | Path) -> HotShiftConfig:
         "limits",
     )
     if "benchmark" in raw:
-        if not isinstance(raw["benchmark"], dict):
-            raise ValueError("benchmark must be a YAML mapping")
-        extra_benchmark_keys = set(raw["benchmark"]) - {
-            "scenarios", "policies", "microbatch_sizes", "history_length", "requests", "repeats"
-        }
-        if extra_benchmark_keys:
-            raise ValueError(f"invalid benchmark: unknown keys: {', '.join(sorted(extra_benchmark_keys))}")
-        benchmark = raw["benchmark"]
-        for name in ("scenarios", "policies", "microbatch_sizes"):
-            if name in benchmark and (not isinstance(benchmark[name], list) or not benchmark[name]):
-                raise ValueError(f"benchmark.{name} must be a non-empty list")
-        if set(benchmark.get("scenarios", [])) - {
-            "stable", "abrupt", "gradual", "brief_burst", "alternating", "uniform"
-        }:
-            raise ValueError("benchmark.scenarios contains an unsupported scenario")
-        if set(benchmark.get("policies", [])) - {
-            "no_cache", "static", "lru", "decayed_lfu", "adaptive"
-        }:
-            raise ValueError("benchmark.policies contains an unsupported policy")
-        if any(int(size) <= 0 or int(size) > 64 for size in benchmark.get("microbatch_sizes", [])):
-            raise ValueError("benchmark microbatch sizes must be between 1 and 64")
-        if int(benchmark.get("requests", 1)) <= 0 or not 1 <= int(benchmark.get("repeats", 1)) <= 10:
-            raise ValueError("benchmark requests must be positive and repeats must be between 1 and 10")
-        if not 0 <= int(benchmark.get("history_length", 0)) <= 256:
-            raise ValueError("benchmark.history_length must be between 0 and 256")
+        validate_benchmark(raw["benchmark"])
 
     data = raw["data"]
     cache = raw["cache"]
@@ -125,7 +149,7 @@ def load_config(path: str | Path) -> HotShiftConfig:
         raise ValueError("data rows or dimensions exceed supported bounds")
     if not 0 < result.cache_capacity <= result.rows:
         raise ValueError("cache.capacity must be between 1 and data.rows")
-    if result.policy not in {"no_cache", "static", "lru", "decayed_lfu", "adaptive"}:
+    if result.policy not in POLICY_NAMES:
         raise ValueError("cache.policy must be no_cache, static, lru, decayed_lfu, or adaptive")
     if min(
         result.max_history_ids,

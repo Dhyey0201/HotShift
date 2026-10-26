@@ -1,53 +1,75 @@
 # HotShift
 
-HotShift demonstrates a bounded embedding cache for pooled music histories. An immutable FP32 embedding table remains on the host; custom CUDA operators probe a dense GPU item map and pool cache or miss rows. The repository also contains a CPU policy simulator, deterministic synthetic traces, a bounded FastAPI service, and a React dashboard.
+HotShift is a single-GPU embedding cache and recommendation serving demonstration. A full, read-only FP32 embedding table stays in CPU memory; a bounded cache of selected rows lives in GPU memory. Pooled embedding requests (mean of a listener's history rows) are served through custom CUDA kernels while cache policies adapt as item popularity shifts. A small synthetic music catalog and a live dashboard make the behavior visible.
 
-This is an engineering demonstration, not a trained recommender or production service. The catalog is fictional. Cache policies are practical baselines and heuristics; no policy is claimed to be novel or universally faster.
+This is an engineering portfolio project, not a trained recommender or a production service. The catalog and listeners are fictional. The adaptive policy is a practical heuristic, not a novel algorithm, and no policy is claimed to be universally better. Performance statements appear only next to the recorded runs that support them.
 
-![HotShift CPU dashboard using live local API metrics](docs/dashboard.png)
+![HotShift dashboard in CPU development mode, showing live API metrics](docs/dashboard.png)
 
-## Current status
+## Architecture
 
-CPU generation, reference pooling, policy simulation, API, and dashboard are implemented and validated. On Kaggle, the CUDA extension built, all 27 CPU/API/CUDA tests passed, the cache/API path passed all four Compute Sanitizer tools, and a CUDA smoke benchmark ran on a Tesla T4. The full repeated GPU matrix, profiler capture, Docker execution, and license decision remain outstanding. CPU replay statistics do not predict GPU speedups.
+```text
+ HTTP clients ──► FastAPI (validation, 422/429/503/504) ──► bounded FIFO queue (1024)
+                                                                │ microbatch: ≤64 requests,
+                                                                │ ≤16384 IDs, ≤2 ms wait
+                                                                ▼
+                                          single engine worker thread (owns all GPU state)
+   host: dedupe IDs ─► probe readback ─► pack misses (pinned) ─► policy ─► maintenance plan
+   GPU:   hotshift::probe_slots ─────────► hotshift::pool_mean ─────────► scatter_rows_ + update_mapping_
+                     item_to_slot[N]        cache_rows[C,D] + miss rows      (invalidate → copy → publish)
+```
 
-## Quick start
+Custom CUDA components (all in `csrc/`): `probe_slots` (dense item→slot map lookup), `gather_rows` (validation and comparison path), `pool_mean` (fused mean pooling over cache and miss rows through descriptors), `scatter_rows_` (copies admitted rows into reserved slots), and `update_mapping_` (invalidates and publishes map entries). Transfers use standard CUDA copies through PyTorch. See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the batch order, event ordering, slot lifetime protocol, and memory equations.
 
-Use Python 3.11 or newer for CPU development; choose a Python release supported by the matched PyTorch CUDA build on a GPU host. Install project and API dependencies, generate the smoke fixture and catalog, then start the local CPU service and UI:
+Cache modes: `no_cache`, `static` (fixed set from a warmup prefix), `lru`, `decayed_lfu`, and `adaptive` (decayed frequency plus a sketch-based shift detector with bounded replacement budgets). Baselines: PyTorch `embedding_bag` on CPU, and a fully GPU-resident PyTorch table (a higher-memory reference, not an equal-budget competitor).
+
+## Status
+
+All CPU-side milestones are implemented and validated locally: data, reference, policies, traces, replay, benchmarks, service, dashboard, Docker CPU stack, and 109 Python plus 16 frontend tests. The CUDA code was rewritten after the earlier Kaggle validation (pinned staging, an owned row-scatter kernel, O(batch) slot management), so **the GPU gates must be rerun** before the release is complete. One command does it on an NVIDIA host: `bash scripts/gpu_evidence.sh` (see [docs/KAGGLE.md](docs/KAGGLE.md)). [docs/STATUS.md](docs/STATUS.md) maps every requirement to its evidence, and [docs/RELEASE.md](docs/RELEASE.md) tracks the release checklist.
+
+## Quick start (CPU development mode)
+
+Requires Python 3.11+ and Node 22. CPU mode runs everything except the CUDA kernels and is labeled as CPU in the API and UI.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -e '.[dev,service]'
+python3 -m venv .venv && source .venv/bin/activate
+python3 -m pip install -r requirements/cpu-py311-linux.lock   # exact pins (Linux, Python 3.11)
+python3 -m pip install -e '.[dev,service]'                     # or this alone on other platforms
 python3 -m hotshift.cli data generate --config configs/smoke.yaml
 python3 -m hotshift.cli data catalog --config configs/smoke.yaml
 python3 -m hotshift.cli test-reference --config configs/smoke.yaml
 python3 -m hotshift.cli serve --config configs/smoke.yaml --backend cpu
 ```
 
-In a second terminal, run `npm install --prefix frontend` and `npm run dev --prefix frontend`. Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:8000`; bind it to localhost for the unauthenticated demo controls.
+In a second terminal: `npm ci --prefix frontend && npm run dev --prefix frontend`, then open http://127.0.0.1:5173. Or run both with Docker: `docker compose --profile cpu up --build`.
 
-Generate a small CPU replay and report with:
+Reproduce a CPU replay benchmark and report:
 
 ```bash
-python3 -m hotshift.cli trace generate --config configs/smoke.yaml --scenario abrupt --seed 42 --requests 1000
+python3 -m hotshift.cli trace generate --config configs/smoke.yaml --scenario abrupt --seed 42
 python3 -m hotshift.cli bench --matrix configs/smoke.yaml --smoke
 python3 -m hotshift.cli report --runs artifacts/runs
 ```
 
-On an NVIDIA GPU host, run the matched CUDA replay matrix with `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml`. Use `--smoke` for a short functional run. This times the serialized CUDA serving path; compare only runs with matching hardware and workload metadata.
+## GPU mode
 
-## CUDA setup
+Requirements: Linux, an NVIDIA GPU and driver, a CUDA toolkit with `nvcc`, a host compiler, and a PyTorch CUDA build matched to that toolkit. An 8 GB GPU handles the smoke and demo profiles; the standard benchmark needs about 0.6 GB of device memory plus allocator slack (see the capacity estimate from `scripts/preflight.py --config configs/benchmark.yaml`). Apple Silicon cannot run CUDA.
 
-CUDA requires Linux, an NVIDIA driver and GPU, `nvcc`, a compatible host compiler, and a PyTorch build matched to the local CUDA toolkit. Install the appropriate PyTorch wheel for the target host first, then install the project. Inspect `python3 scripts/preflight.py --backend cuda`, build with `python3 -m hotshift.cli build-extension`, run `python3 -m pytest tests/cuda -m cuda`, run `bash scripts/run_sanitizers.sh`, and use `python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml` for GPU measurements. The Kaggle setup is documented in [docs/KAGGLE.md](docs/KAGGLE.md).
+```bash
+python3 scripts/preflight.py --backend cuda --deep      # device, toolkit, kernel run, profiler counters
+python3 -m hotshift.cli build-extension
+python3 -m pytest tests/cuda -m cuda
+bash scripts/run_sanitizers.sh
+python3 -m hotshift.cli serve --config configs/demo.yaml --backend cuda
+python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml
+```
 
-The GPU engine uses a dense `item_to_slot` map, a fixed-capacity row cache, bounded miss staging, a custom CUDA probe, and a fused custom mean-pooling kernel. The reference path deliberately synchronizes the probe for host miss planning and serializes cache updates. It is not an asynchronous overlapping pipeline. The entire embedding table stays on the CPU.
+GPU mode fails clearly when CUDA is unavailable and never falls back to CPU. Run one worker only: each worker would own a separate cache and GPU context.
 
-## Development and artifacts
+## Documents
 
-- `configs/smoke.yaml` is for CPU correctness and UI development.
-- `configs/demo.yaml` and `configs/benchmark.yaml` describe larger profiles; preflight estimates host and device capacity before GPU runs.
-- Generated tables, traces, benchmark results, and profiler captures stay under ignored `artifacts/`.
-- The live dashboard only displays API metrics. CPU miss bytes are a source-row estimate, not measured PCIe transfer bytes.
-- Run `python3 scripts/release_check.py` for local CPU/UI checks and the CUDA gate. It returns blocked when run without a CUDA host.
+[Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md) · [Benchmarks](docs/BENCHMARKS.md) · [Performance log](docs/PERFORMANCE.md) · [Decisions](docs/DECISIONS.md) · [Status](docs/STATUS.md) · [Demo script](docs/DEMO.md) · [Release checklist](docs/RELEASE.md) · [Kaggle GPU runs](docs/KAGGLE.md)
 
-Read [the architecture](docs/ARCHITECTURE.md), [developer setup](docs/DEVELOPMENT.md), [benchmark protocol](docs/BENCHMARKS.md), [demo script](docs/DEMO.md), and [implementation status](docs/STATUS.md). No redistribution license is selected yet; confirm one before publishing code for reuse.
+## Credits and license
+
+Related systems that informed the design (no code was copied): NVIDIA's [nv-embedding-cache](https://github.com/NVIDIA/nv-embedding-cache), Meta's [FBGEMM](https://docs.pytorch.org/FBGEMM/) embedding operators, and the PyTorch custom C++/CUDA operator tutorial. HotShift is not endorsed by NVIDIA, Meta, or PyTorch. The dense direct map is a simple array, not a hash table. Released under the [MIT License](LICENSE).

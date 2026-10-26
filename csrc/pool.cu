@@ -65,6 +65,8 @@ torch::Tensor pool_mean_cuda(
     TORCH_CHECK(cache_rows.dim() == 2 && miss_rows.dim() == 2 && source_index.dim() == 1 &&
         unique_inverse.dim() == 1 && offsets.dim() == 1, "pool input dimensions are invalid");
     TORCH_CHECK(cache_rows.size(1) == miss_rows.size(1), "row buffer dimensions differ");
+    TORCH_CHECK(!cache_rows.requires_grad() && !miss_rows.requires_grad(),
+        "hotshift::pool_mean is inference-only and does not support gradients");
     TORCH_CHECK(offsets.numel() >= 1, "offsets must contain at least the initial zero");
     const int64_t bags = offsets.numel() - 1;
     const int64_t dimensions = cache_rows.size(1);

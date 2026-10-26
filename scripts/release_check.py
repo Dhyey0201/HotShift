@@ -1,43 +1,110 @@
+"""Release gate (blueprint section 28). Exits 0 only when every mandatory check passes.
+
+CPU-side checks always run. Without a CUDA host the script exits 2 (BLOCKED) after them;
+it never reports skipped GPU work as passed. A JSON release summary is written either way.
+"""
+
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from hotshift.benchmark.common import environment, git_state, is_complete_run
 from hotshift.preflight import preflight
 
-required = [
-    "README.md",
-    "docs/STATUS.md",
-    "src/hotshift/engine/cpu.py",
-    "src/hotshift/serving/app.py",
-    "csrc/probe.cu",
-    "csrc/pool.cu",
-    "frontend/package.json",
+REQUIRED_FILES = [
+    "README.md", "LICENSE", "docs/ARCHITECTURE.md", "docs/DEVELOPMENT.md", "docs/BENCHMARKS.md",
+    "docs/DECISIONS.md", "docs/STATUS.md", "docs/DEMO.md", "docs/PERFORMANCE.md", "docs/RELEASE.md",
+    "requirements/cpu-py311-linux.lock", "frontend/package-lock.json", "csrc/probe.cu", "csrc/pool.cu",
 ]
-missing = [name for name in required if not (ROOT / name).exists()]
-gpu = preflight("cuda")
-report = {"missing_files": missing, "cuda_status": gpu["cuda_status"], "cuda_block_reason": gpu["cuda_block_reason"]}
-print(json.dumps(report, indent=2))
-if missing:
-    raise SystemExit(1)
-commands = [
-    [sys.executable, "-m", "pytest", "tests/cpu", "tests/integration"],
-    ["npm", "run", "test", "--prefix", "frontend"],
-    ["npm", "run", "build", "--prefix", "frontend"],
-]
-for command in commands:
-    subprocess.run(command, cwd=ROOT, check=True)
-if gpu["cuda_status"] != "available":
-    print("RELEASE BLOCKED: mandatory CUDA validation requires an NVIDIA CUDA host", file=sys.stderr)
-    raise SystemExit(2)
-subprocess.run([sys.executable, "-m", "hotshift.cli", "data", "generate", "--config", "configs/smoke.yaml"], cwd=ROOT, check=True)
-subprocess.run([sys.executable, "-m", "hotshift.cli", "data", "catalog", "--config", "configs/smoke.yaml"], cwd=ROOT, check=True)
-subprocess.run([sys.executable, "-m", "hotshift.cli", "build-extension"], cwd=ROOT, check=True)
-subprocess.run([sys.executable, "-m", "pytest", "tests/cuda", "-m", "cuda"], cwd=ROOT, check=True)
-subprocess.run(["bash", "scripts/run_sanitizers.sh"], cwd=ROOT, check=True)
-subprocess.run([sys.executable, "-m", "hotshift.cli", "bench-cuda", "--matrix", "configs/smoke.yaml", "--smoke"], cwd=ROOT, check=True)
+# Phrases that need measured backing; a line passes only when it negates or qualifies them.
+CLAIM_PATTERNS = re.compile(r"(novel|state[- ]of[- ]the[- ]art|production[- ](ready|scale)|\d+(\.\d+)?x faster|universally|NVIDIA[- ]scale)", re.IGNORECASE)
+QUALIFIERS = re.compile(r"\b(not|no|never|avoid|without|nor|does not|do not)\b", re.IGNORECASE)
+
+results: list[dict[str, object]] = []
+
+
+def record(name: str, ok: bool, detail: str = "") -> bool:
+    results.append({"check": name, "ok": ok, "detail": detail})
+    print(f"[{'PASS' if ok else 'FAIL'}] {name}{': ' + detail if detail else ''}", flush=True)
+    return ok
+
+
+def run(name: str, command: list[str], env: dict[str, str] | None = None) -> bool:
+    import os
+
+    completed = subprocess.run(command, cwd=ROOT, env={**os.environ, **(env or {})}, check=False)
+    return record(name, completed.returncode == 0, " ".join(command))
+
+
+def claim_scan() -> bool:
+    offenders = []
+    for path in [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]:
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if CLAIM_PATTERNS.search(line) and not QUALIFIERS.search(line):
+                offenders.append(f"{path.relative_to(ROOT)}:{number}")
+    return record("unsupported claim scan", not offenders, ", ".join(offenders))
+
+
+def gpu_evidence() -> bool:
+    runs = [path for path in (ROOT / "artifacts" / "runs").glob("*-cuda-*") if is_complete_run(path)]
+    full = []
+    for path in runs:
+        manifest = json.loads((path / "manifest.json").read_text())
+        summary = json.loads((path / "summary.json").read_text())
+        scenarios = {row["scenario"] for row in summary}
+        required = {"stable", "abrupt", "brief_burst", "uniform"}
+        if not manifest.get("smoke") and required <= scenarios and all(row["output_check"]["passed"] for row in summary):
+            full.append(path.name)
+    return record("full CUDA matrix with verified outputs", bool(full), ", ".join(full) or "no complete non-smoke CUDA run under artifacts/runs")
+
+
+def main() -> int:
+    missing = [name for name in REQUIRED_FILES if not (ROOT / name).exists()]
+    record("required files", not missing, ", ".join(missing))
+    claim_scan()
+    run("ruff", [sys.executable, "-m", "ruff", "check", "src", "tests", "scripts"])
+    run("CPU and integration tests", [sys.executable, "-m", "pytest", "tests/cpu", "tests/integration", "-q"])
+    run("frontend unit tests", ["npm", "run", "test", "--prefix", "frontend"])
+    run("frontend production build", ["npm", "run", "build", "--prefix", "frontend"])
+    gpu = preflight("cuda")
+    blocked = gpu["cuda_status"] != "available"
+    if blocked:
+        record("CUDA gates", False, f"BLOCKED: {gpu['cuda_block_reason']}")
+    else:
+        run("build extension", [sys.executable, "-m", "hotshift.cli", "build-extension"])
+        run("CUDA tests (zero skips allowed)", [sys.executable, "-m", "pytest", "tests/cuda", "-q"], {"HOTSHIFT_REQUIRE_CUDA": "1"})
+        run("Compute Sanitizer", ["bash", "scripts/run_sanitizers.sh"])
+        run("CUDA smoke benchmark", [sys.executable, "-m", "hotshift.cli", "bench-cuda", "--matrix", "configs/smoke.yaml", "--smoke"])
+        gpu_evidence()
+    summary = {
+        "generated_utc": datetime.now(UTC).isoformat(),
+        **git_state(),
+        "environment": environment(include_cuda=not blocked),
+        "cuda_status": gpu["cuda_status"],
+        "checks": results,
+        "commands": ["python3 scripts/release_check.py", "bash scripts/gpu_evidence.sh"],
+        "remaining_optional_work": [
+            "FP16 storage", "GPU hash-table mapping", "overlapping batches with slot lifetimes",
+            "external FBGEMM or NVIDIA embedding-cache baseline", "licensed real music dataset",
+        ],
+    }
+    target = ROOT / "artifacts" / "release"
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "release_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    failed = [item for item in results if not item["ok"]]
+    if blocked and all(item["ok"] for item in results if item["check"] != "CUDA gates"):
+        print("RELEASE BLOCKED: CPU-side checks pass; mandatory CUDA validation requires an NVIDIA CUDA host", file=sys.stderr)
+        return 2
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,9 @@ name = "hotshift"
 version = "0.1.0"
 description = "A reproducible embedding cache and recommendation serving demonstration"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Dhyey Patel" }]
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.0,<3",
@@ -14,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "pytest-asyncio>=0.25,<1", "httpx>=0.28,<1", "ruff>=0.9,<1", "fastapi>=0.115,<1"]
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.25,<1", "httpx>=0.28,<1", "ruff>=0.9,<1", "fastapi>=0.115,<1", "hypothesis>=6.100,<7"]
 service = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1"]
 
 [tool.setuptools.packages.find]
@@ -26,6 +29,8 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "src/hotshift/serving/scheduler.py" = ["BLE001"]
+"src/hotshift/serving/worker.py" = ["BLE001"]
+"src/hotshift/benchmark/loadtest.py" = ["BLE001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,24 @@
+# Dimension sweep (blueprint 17.4): D=32, same rows and 10 percent cache budget.
+profile: sweep_dim32
+data:
+  rows: 1000000
+  dimensions: 32
+  seed: 42
+  output_dir: artifacts/data/standard_d32
+cache:
+  capacity: 100000
+  policy: adaptive
+limits:
+  max_history_ids: 256
+  max_batch_requests: 64
+  max_batch_ids: 16384
+  queue_capacity: 1024
+  max_batch_delay_ms: 2.0
+benchmark:
+  scenarios: [stable, abrupt]
+  policies: [no_cache, lru, adaptive]
+  baselines: [torch_gpu_resident]
+  microbatch_sizes: [16]
+  history_length: 32
+  requests: 50000
+  repeats: 3

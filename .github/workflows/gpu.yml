@@ -1,29 +1,27 @@
 name: Manual GPU validation
 
+# Runs only when dispatched by a maintainer on an explicitly configured, trusted self-hosted
+# GPU runner. It never triggers on pull requests, so untrusted code cannot reach the runner.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "quick (gates + smoke) or full (all benchmarks, hours)"
+        default: quick
+
+permissions:
+  contents: read
 
 jobs:
   cuda:
     runs-on: [self-hosted, linux, x64, gpu]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
       - run: python -m pip install -e '.[dev,service]'
-      - run: python scripts/preflight.py --backend cuda
-      - run: python -m hotshift.cli data generate --config configs/smoke.yaml
-      - run: python -m hotshift.cli data catalog --config configs/smoke.yaml
-      - run: python -m hotshift.cli build-extension
-      - run: python -m pytest tests/cpu tests/integration tests/cuda
-      - run: bash scripts/run_sanitizers.sh
-      - run: python -m hotshift.cli bench-cuda --matrix configs/smoke.yaml --smoke
+      - run: bash scripts/gpu_evidence.sh ${{ inputs.mode == 'full' && '' || '--quick' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hotshift-gpu-validation
-          path: |
-            artifacts/runs/**
-            artifacts/sanitizers/**
-          if-no-files-found: ignore
+          name: hotshift-gpu-evidence
+          path: artifacts/hotshift-gpu-evidence-*.tar.gz
+          if-no-files-found: warn

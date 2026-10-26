@@ -5,6 +5,8 @@
 
 namespace {
 
+// One thread per update entry. Callers deduplicate keys and slots, so each map entry has
+// at most one writer within a launch.
 __global__ void mapping_kernel(
     int32_t* item_to_slot,
     const int64_t* old_keys,
@@ -19,6 +21,27 @@ __global__ void mapping_kernel(
     const int32_t slot = slots[index];
     if (old_key >= 0 && old_key < item_count) item_to_slot[old_key] = -1;
     if (new_key >= 0 && new_key < item_count) item_to_slot[new_key] = slot;
+}
+
+// Copies packed source rows into reserved cache slots. Each (entry, dimension) output
+// coordinate has exactly one writer; row offsets use 64-bit arithmetic.
+__global__ void scatter_rows_kernel(
+    float* cache_rows,
+    const float* source_rows,
+    const int64_t* source_positions,
+    const int32_t* slots,
+    int64_t count,
+    int64_t dimensions,
+    int64_t cache_capacity,
+    int64_t source_count) {
+    const int64_t flat = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (flat >= count * dimensions) return;
+    const int64_t entry = flat / dimensions;
+    const int64_t dimension = flat % dimensions;
+    const int64_t slot = slots[entry];
+    const int64_t source = source_positions[entry];
+    if (slot < 0 || slot >= cache_capacity || source < 0 || source >= source_count) return;
+    cache_rows[slot * dimensions + dimension] = source_rows[source * dimensions + dimension];
 }
 
 }
@@ -63,3 +86,37 @@ void update_mapping_cuda(
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
+void scatter_rows_cuda(
+    torch::Tensor cache_rows,
+    torch::Tensor source_rows,
+    torch::Tensor source_positions,
+    torch::Tensor slots) {
+    check_cuda_tensor(cache_rows, "cache_rows");
+    check_cuda_tensor(source_rows, "source_rows");
+    check_cuda_tensor(source_positions, "source_positions");
+    check_cuda_tensor(slots, "slots");
+    check_same_device(cache_rows, source_rows, "scatter inputs");
+    check_same_device(cache_rows, source_positions, "scatter inputs");
+    check_same_device(cache_rows, slots, "scatter inputs");
+    TORCH_CHECK(cache_rows.scalar_type() == torch::kFloat32 && source_rows.scalar_type() == torch::kFloat32,
+        "row buffers must be float32");
+    TORCH_CHECK(source_positions.scalar_type() == torch::kInt64, "source_positions must be int64");
+    TORCH_CHECK(slots.scalar_type() == torch::kInt32, "slots must be int32");
+    TORCH_CHECK(cache_rows.dim() == 2 && source_rows.dim() == 2 && source_positions.dim() == 1 && slots.dim() == 1,
+        "scatter input dimensions are invalid");
+    TORCH_CHECK(cache_rows.size(1) == source_rows.size(1), "row buffer dimensions differ");
+    TORCH_CHECK(source_positions.numel() == slots.numel(), "scatter update lengths differ");
+    TORCH_CHECK(cache_rows.is_contiguous() && source_rows.is_contiguous() && source_positions.is_contiguous() && slots.is_contiguous(),
+        "scatter inputs must be contiguous");
+    const int64_t dimensions = cache_rows.size(1);
+    const int64_t total = slots.numel() * dimensions;
+    if (total == 0) return;
+    c10::cuda::CUDAGuard guard(cache_rows.device());
+    constexpr int threads = 256;
+    const int64_t blocks = (total + threads - 1) / threads;
+    TORCH_CHECK(blocks <= 2147483647LL, "scatter launch exceeds the supported grid size");
+    scatter_rows_kernel<<<static_cast<unsigned int>(blocks), threads, 0, at::cuda::getCurrentCUDAStream()>>>(
+        cache_rows.data_ptr<float>(), source_rows.data_ptr<float>(), source_positions.data_ptr<int64_t>(),
+        slots.data_ptr<int32_t>(), slots.numel(), dimensions, cache_rows.size(0), source_rows.size(0));
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}

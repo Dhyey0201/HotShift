@@ -1,0 +1,28 @@
+# CUDA development image: NVCC and headers are required to compile the extension; a
+# runtime-only image is insufficient. Pin this tag by digest after validating it on the
+# target GPU host (see docs/DEVELOPMENT.md); the digest is not recorded until then.
+ARG CUDA_BASE=pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
+FROM ${CUDA_BASE}
+
+WORKDIR /app
+COPY requirements/cpu-py311-linux.lock requirements/cpu-py311-linux.lock
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+COPY csrc ./csrc
+COPY configs ./configs
+# torch comes from the base image; install the rest without replacing it.
+RUN python -m pip install --no-cache-dir "numpy>=2.0,<3" "PyYAML>=6,<7" "fastapi>=0.115,<1" "uvicorn[standard]>=0.34,<1" \
+ && python -m pip install --no-cache-dir --no-deps -e .
+
+# Compile the owned operators once at image build so no request ever triggers a build.
+ENV TORCH_EXTENSIONS_DIR=/opt/hotshift/torch_extensions \
+    TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
+RUN python -m hotshift.cli build-extension --no-device-check
+
+ENV HOTSHIFT_BACKEND=cuda \
+    HOTSHIFT_CONFIG=configs/demo.yaml \
+    HOTSHIFT_ARTIFACT_DIR=/app/artifacts
+EXPOSE 8000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=5 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"
+CMD ["sh", "-c", "python -m hotshift.cli data generate --config \"$HOTSHIFT_CONFIG\" --if-missing && python -m hotshift.cli data catalog --config \"$HOTSHIFT_CONFIG\" && exec python -m hotshift.cli serve --config \"$HOTSHIFT_CONFIG\" --backend cuda --host 0.0.0.0 --port 8000"]
