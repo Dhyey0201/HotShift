@@ -14,7 +14,7 @@ All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 5
 | Dimension sweeps D = 32 and D = 256 | Complete | `20261026T044419Z-cuda-70844ddc`, `20261026T044721Z-cuda-f852b250` |
 | Kernel microbenchmark | Complete | `20261026T013214Z-kernels-2a46fa6b` |
 | `torch.profiler` capture | Complete; Nsight Compute denied by the host (`ERR_NVGPUCTRPERM`) | `artifacts/profiles/20261026T013217Z-torchprof-5639e316` |
-| Open-loop load sweep | **Capacity not established.** The probe was invalid (see below); a stepped-ramp replacement is pending a rerun | `20261026T045029Z-load-9ffc3528` … `20261026T050224Z-load-9b8b891b` |
+| Open-loop load sweep | Complete: sustains 250 req/s, fails at 400 req/s | `20261026T060043Z-load-2c5689b9` … `20261026T060646Z-load-a3d5c6d9` (the earlier `20261026T045029Z` … `050224Z` sweep used an invalid probe and is superseded) |
 
 ## Results (Tesla T4)
 
@@ -78,9 +78,25 @@ The adaptive policy recovers **10× slower** than LRU, because its per-window re
 
 The fused kernel beats gather-then-pool for bags up to 32 (1.1× to 1.8×), the case the serving path uses. It loses at 256, and PyTorch's `embedding_bag` on a resident table is about 2× faster for long bags. Its one-thread-per-(bag, dimension) mapping leaves room for improvement. Maximum absolute error was 0 in every case.
 
-### Load sweep
+### Load sweep (demo profile, 250k × 128, adaptive policy, one server worker)
 
-At offered rates up to 108 req/s, all 6,000 requests per step succeeded with a client p99 of 7.6–8.9 ms, and an overload trace with 10× bursts kept every request successful but pushed p99 to 1.4 s. These runs **do not establish capacity**. The capacity probe sent 6,000 requests in about 0.1 s against a cold server; the client dropped 5,488 at its in-flight limit and the remaining 512 waited up to 5.9 s, so its "86 req/s" understated what the server sustains. `scripts/load_sweep.py` now warms the server and ramps the rate until a step misses its objective (more than 1% unsuccessful or p99 above 50 ms). It needs a rerun: `bash scripts/gpu_evidence.sh --load`.
+Open-loop, stable traffic, history length 32, client on the same Kaggle host. Objective: at most 1% of requests unsuccessful and client p99 at most 50 ms.
+
+| Offered rate (req/s) | Successful | Client p99 (ms) | Run |
+| ---: | ---: | ---: | --- |
+| 50 (ramp) | 1,000 / 1,000 | 8.9 | `20261026T060104Z-load-b7de9850` |
+| 100 | 6,000 / 6,000 | 7.6 | `20261026T060437Z-load-66550d89` |
+| 150 | 6,000 / 6,000 | 8.8 | `20261026T060518Z-load-cad5220e` |
+| 200 | 6,000 / 6,000 | 9.9 | `20261026T060548Z-load-7e3dfb06` |
+| 250 | 6,000 / 6,000 | 13.0 | `20261026T060612Z-load-6c140df0` |
+| 400 (ramp) | 3,457 / 4,000 | 5,031 | `20261026T060136Z-load-408469bb` |
+| Overload trace (10× bursts on 100) | 3,915 / 6,000 | 7,020 | `20261026T060646Z-load-a3d5c6d9` |
+
+The service **sustains 250 req/s and fails its objective at 400 req/s**. At 400 the queue backed up until 512 requests were in flight, the client dropped 543 dispatches at that limit, and p99 reached 5 s. The client kept to its schedule (dispatch lag p99 31 ms vs 5 s of latency), so the server, not the client, saturated. No request was rejected with 429 and none timed out, even though the server's queue timeout is 2 s; the most likely reading is that the backlog formed before requests reached the bounded scheduler queue (in the HTTP worker's connection and request handling), which is therefore not protecting latency at this load.
+
+This is about 2% of what the engine sustains offline at similar batch sizes (10,000 to 20,000 req/s), so the single Python HTTP worker (`/api/v1/embeddings/pool`: request parsing, validation, JSON encoding of 128-float vectors), not the cache engine, bounds the service. Profiling the worker is the next step before changing it. The ramp doubled from 50, so capacity lies between 250 and 400 req/s. `scripts/load_sweep.py` now bisects that bracket (3 steps by default) on its next run.
+
+An earlier sweep (`20261026T045029Z` … `050224Z`) measured "capacity" by flooding a cold server with 6,000 requests in about 0.1 s; the client dropped 5,488 and the result (86 req/s) was invalid. It is kept only as a record.
 
 ## Workloads
 

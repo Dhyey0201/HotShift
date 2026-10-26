@@ -39,14 +39,14 @@ The measured result is unfavorable to the dynamic policies: on the T4 they are s
 | 3 Bounded cache engine | complete (T4) |
 | 4 Policies and traces | complete |
 | 5 Benchmark foundation | complete; full GPU comparison recorded |
-| 6 Serving and scheduling | complete; GPU capacity sweep needs a rerun |
+| 6 Serving and scheduling | complete; T4 load sweep recorded |
 | 7 Music demo and dashboard | complete on CPU |
 | 8 Profiling and optimization | P1 to P4 measured; P5 open |
 | 9 Evidence and release | release check passes |
 
 ## Known issues
 
-- **Load sweep capacity not established.** The first capacity probe flooded a cold server and was invalid. `scripts/load_sweep.py` now warms up and ramps; rerun with `bash scripts/gpu_evidence.sh --load` (Kaggle cell 3 in [KAGGLE.md](KAGGLE.md)).
+- **Service capacity is bounded by the HTTP worker, not the engine.** It sustains 250 req/s and fails at 400 req/s on the T4, about 2% of the engine's offline throughput ([BENCHMARKS.md](BENCHMARKS.md), load sweep).
 - **Dynamic policies are slower than no caching on the T4.** Python policy and maintenance work dominates (PERFORMANCE P5).
 - `Dockerfile.cuda` has not been built; its base image must be validated and pinned by digest.
 - Nsight Compute is denied on Kaggle (`ERR_NVGPUCTRPERM`); profiling evidence is `torch.profiler` only.

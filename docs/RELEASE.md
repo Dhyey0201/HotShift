@@ -20,6 +20,6 @@ Blueprint section 28. `python3 scripts/release_check.py` automates the checks ma
 | Docs current | ✅ | ⚙ required-file check and claim scan |
 | Release summary with commit, commands, hardware, remaining work | ⚙ | `artifacts/release/release_summary.json` |
 
-Open items outside the checklist: the load sweep's capacity measurement needs a rerun (`gpu_evidence.sh --load`), and `Dockerfile.cuda` has not been built or pinned.
+Open item outside the checklist: `Dockerfile.cuda` has not been built or pinned.
 
 Legend: ✅ done, ⏳ waiting on a GPU run.

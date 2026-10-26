@@ -7,6 +7,7 @@ The ramp warms the server first, then doubles the offered rate until a step miss
 service objective: more than 1% of requests rejected, expired, failed, or dropped, or a p99
 above ``--slo-ms``. A step that meets the objective while its client dispatch lag p99 exceeds
 ``--max-lag-ms`` stops the ramp as client-limited: the client, not the server, set the load.
+After a miss, ``--refine-steps`` bisections narrow the bracket between passing and failing rates.
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ parser.add_argument("--start-rate", type=float, default=50.0)
 parser.add_argument("--max-rate", type=float, default=6400.0)
 parser.add_argument("--slo-ms", type=float, default=50.0)
 parser.add_argument("--max-lag-ms", type=float, default=20.0)
+parser.add_argument("--refine-steps", type=int, default=3)
 parser.add_argument("--output", default="artifacts/traces/load")
 arguments = parser.parse_args()
 
@@ -68,6 +70,20 @@ while rate <= arguments.max_rate:
         break
     capacity = rate
     rate *= 2
+# Doubling only brackets capacity; bisect between the last passing and first failing rate.
+failing = rate if stop_reason.startswith("objective missed") else None
+for _ in range(arguments.refine_steps if capacity is not None and failing is not None else 0):
+    middle = (capacity + failing) / 2
+    step = offer(f"refine-{middle:g}", middle, int(min(max(middle * 10, 1000), 20000)))
+    print(json.dumps({"refine": step}))
+    if step["unsuccessful_fraction"] > 0.01 or step["p99_ms"] is None or step["p99_ms"] > arguments.slo_ms:
+        failing = middle
+    elif step["lag_p99_ms"] is not None and step["lag_p99_ms"] > arguments.max_lag_ms:
+        break
+    else:
+        capacity = middle
+if failing is not None:
+    stop_reason += f"; capacity lies between {capacity:g} and {failing:g} req/s"
 print(json.dumps({"measured_capacity_rate": capacity, "slo_ms": arguments.slo_ms, "stop_reason": stop_reason}))
 if capacity is None:
     raise SystemExit("the starting rate already missed the objective; lower --start-rate")
