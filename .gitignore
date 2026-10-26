@@ -21,3 +21,4 @@ artifacts/**
 .env
 
 hotshift-*.tar.gz
+HotShift_Implementation_Blueprint.md
