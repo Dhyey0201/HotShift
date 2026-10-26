@@ -20,3 +20,4 @@ artifacts/**
 !artifacts/.gitkeep
 .env
 
+hotshift-*.tar.gz

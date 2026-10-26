@@ -2,14 +2,85 @@
 
 ## Current evidence
 
-| Evidence | Status |
-| --- | --- |
-| CPU replay matrix (policy semantics, CPU timings) | Generated locally; `hotshift bench`. Not GPU evidence. |
-| CUDA correctness gates | Passed on Kaggle T4 for the **pre-rewrite** engine; the current engine must be revalidated. |
-| CUDA replay matrix, sweeps, ablation, kernel microbenchmark, load sweep | Implemented; **not yet run**. One command: `bash scripts/gpu_evidence.sh`. |
-| Profiler evidence | Nsight Compute denied on Kaggle (`ERR_NVGPUCTRPERM`); `hotshift profile-torch` (CUPTI tracing) is the fallback. |
+All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 580.178.04, CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.13) at commit `57cbca1`, with a clean tree. The raw directories are in `artifacts/runs/` (not committed; regenerate with `bash scripts/gpu_evidence.sh`), and `artifacts/runs/REPORT.md` holds every row.
 
-No GPU performance claim is made until those runs exist. This file is updated from `artifacts/runs/REPORT.md` once they do. Every number must link to its run directory.
+| Evidence | Status | Run |
+| --- | --- | --- |
+| CUDA tests with `HOTSHIFT_REQUIRE_CUDA=1` | 157 passed; the 2 skips are CPU-only tests that skip when a GPU is present | `artifacts/logs/gpu_evidence.log` |
+| Compute Sanitizer (memcheck, racecheck, initcheck, synccheck) | 0 errors, 0 hazards on all 45 operator and engine tests | `artifacts/sanitizers/` |
+| Standard matrix (1M × 128, C/N = 0.10, 3 seeds, 100k requests) | Complete; every output check passed | `20261026T013249Z-cuda-67ce68c2` |
+| Ablation (staging and admission baselines) | Complete | `20261026T041525Z-cuda-cf672a53` |
+| Cache-fraction sweep | Complete | `20261026T043300Z-cuda-a80b131d` |
+| Dimension sweeps D = 32 and D = 256 | Complete | `20261026T044419Z-cuda-70844ddc`, `20261026T044721Z-cuda-f852b250` |
+| Kernel microbenchmark | Complete | `20261026T013214Z-kernels-2a46fa6b` |
+| `torch.profiler` capture | Complete; Nsight Compute denied by the host (`ERR_NVGPUCTRPERM`) | `artifacts/profiles/20261026T013217Z-torchprof-5639e316` |
+| Open-loop load sweep | **Capacity not established.** The probe was invalid (see below); a stepped-ramp replacement is pending a rerun | `20261026T045029Z-load-9ffc3528` … `20261026T050224Z-load-9b8b891b` |
+
+## Results (Tesla T4)
+
+### Headline: on this GPU, the bounded cache saves memory but not time
+
+The 1M × 128 FP32 table is 512 MB, which fits easily in the T4's 15.6 GB. At that size the full-table reference is the fastest option, and among the equal-budget cache modes, **no cache or a static cache beats every adaptive policy on throughput**. The cache's measured benefits are memory and transfer volume, not throughput:
+
+- Device memory: 64.5 MB for every cache mode (51.2 MB of cached rows, 4 MB map, 9.3 MB staging) vs 512 MB for `torch_gpu_resident`.
+- Host→device bytes, stable traffic, batch 16: 1.29 GB with `no_cache` vs 0.32 GB with `static` (−75%) and 0.35 GB with `lru` (−73%).
+
+Stable traffic, warm, median of 3 seeds (requests/s; hit rate in parentheses):
+
+| Engine | Batch 1 | Batch 16 | Batch 64 |
+| --- | ---: | ---: | ---: |
+| `no_cache` | 1,459 | 16,178 | 41,108 |
+| `static` (0.890) | 1,487 | **17,669** | **47,968** |
+| `lru` (0.887) | 875 | 6,229 | 10,502 |
+| `decayed_lfu` (0.889) | 815 | 5,477 | 8,613 |
+| `adaptive` (0.889) | 1,174 | 10,438 | 20,712 |
+| `torch_cpu` (reference) | 5,574 | 44,869 | 98,856 |
+| `torch_gpu_resident` (reference, 8× the memory) | 4,336 | 42,414 | 98,260 |
+
+`static` is the only cache mode faster than `no_cache`: +2% at batch 1, +9% at batch 16, +17% at batch 64. Every dynamic policy is slower than `no_cache`, from 1.2× (adaptive, batch 1) to 4.8× (decayed LFU, batch 64). The same ordering holds in the abrupt and brief-burst scenarios, at every cache fraction from 0.01 to 0.25, and at D = 32 and D = 256.
+
+### Why: host work, not the GPU, sets the batch time
+
+Per-batch stage means, stable, batch 64, seed 42 (ms):
+
+| Stage | `no_cache` | `static` | `lru` | `adaptive` |
+| --- | ---: | ---: | ---: | ---: |
+| Policy update (Python) | 0.06 | 0.02 | **3.18** | **1.59** |
+| Maintenance (host side of invalidate, scatter, publish) | 0.02 | 0.02 | **1.41** | 0.10 |
+| Deduplicate + pack (host) | 0.80 | 0.63 | 0.67 | 0.66 |
+| Miss transfer + pool + output copy | 0.38 | 0.37 | 0.38 | 0.39 |
+| Probe (incl. readback sync) | 0.23 | 0.22 | 0.23 | 0.24 |
+| **Batch wall time p50** | **1.52** | **1.30** | **5.79** | **2.76** |
+| GPU kernels (probe + pool + maintenance) | 0.24 | 0.25 | 0.35 | 0.26 |
+
+GPU kernel time is a small fraction of every batch. LRU and decayed LFU replace a row on nearly every miss (about 508,000 and 496,000 admissions per run), so their Python bookkeeping and the maintenance transaction dominate. The adaptive policy's replacement budget limits admissions to 17,408, but its sketch update still costs 1.6 ms per batch. PCIe is not the bottleneck: removing three quarters of the H2D bytes saves less time than the policy adds.
+
+### Shift behavior (abrupt scenario, batch 16)
+
+| Policy | Hit rate | Recovery to 90% of the post-shift reference |
+| --- | ---: | --- |
+| `lru` | 0.881 | 2,000 requests (all 3 seeds) |
+| `decayed_lfu` | 0.883 | 2,000 requests (all 3 seeds) |
+| `adaptive` | 0.823 | 20,000 requests (all 3 seeds) |
+| `static` | 0.350 | not recovered |
+
+The adaptive policy recovers **10× slower** than LRU, because its per-window replacement budget (1,024 rows in shift mode) caps how fast the hot set can move. It does not overreact to the brief burst (hit rate 0.856 vs LRU 0.876), but it does not beat LRU there either. In the uniform scenario every policy reaches the expected ≈0.10 hit rate, and the dynamic policies are 1.3× to 18.7× slower than `no_cache`.
+
+### Kernel microbenchmark (D = 128, 64 bags, CUDA event median)
+
+| Bag length | Fused pool (µs) | Gather + `embedding_bag` (µs) | Resident `embedding_bag` (µs) |
+| ---: | ---: | ---: | ---: |
+| 1 | 24.5 | 43.0 | 29.1 |
+| 8 | 24.5 | 42.9 | 27.0 |
+| 32 | 38.4 | 43.5 | 30.1 |
+| 128 | 122.9 | 127.0 | 68.3 |
+| 256 | 258.1 | 232.3 | 128.4 |
+
+The fused kernel beats gather-then-pool for bags up to 32 (1.1× to 1.8×), the case the serving path uses. It loses at 256, and PyTorch's `embedding_bag` on a resident table is about 2× faster for long bags. Its one-thread-per-(bag, dimension) mapping leaves room for improvement. Maximum absolute error was 0 in every case.
+
+### Load sweep
+
+At offered rates up to 108 req/s, all 6,000 requests per step succeeded with a client p99 of 7.6–8.9 ms, and an overload trace with 10× bursts kept every request successful but pushed p99 to 1.4 s. These runs **do not establish capacity**. The capacity probe sent 6,000 requests in about 0.1 s against a cold server; the client dropped 5,488 at its in-flight limit and the remaining 512 waited up to 5.9 s, so its "86 req/s" understated what the server sustains. `scripts/load_sweep.py` now warms the server and ramps the rate until a step misses its objective (more than 1% unsuccessful or p99 above 50 ms). It needs a rerun: `bash scripts/gpu_evidence.sh --load`.
 
 ## Workloads
 
@@ -39,7 +110,7 @@ Equal-budget cache modes (`no_cache`, `static`, `lru`, `decayed_lfu`, `adaptive`
 - Outputs are verified against the CPU reference every `verify_every` batches. Any mismatch is recorded in the summary and fails the release check.
 - Seeds repeat 3 times, and policy order rotates per seed. `aggregate.json` reports the median, min, and max across seeds, and `summary.json` keeps every run. Percentiles come from raw batch samples. A median of p99 values is not a confidence interval.
 - **Recovery** (abrupt scenario): windows of `requests/100` trace requests. The target is the hit rate of a separate warmed run on the `post_shift` distribution with the same policy and budget. Recovery is the requests (and processing and scheduled time) from the known boundary until three consecutive windows reach 90% of that target, or `not_recovered`. Detection (the adaptive shift transition) is reported separately.
-- **Open-loop service replay** (`hotshift loadtest`, `scripts/load_sweep.py`) dispatches on the trace timeline. It records dispatch lag, drops dispatches when the client's in-flight limit is hit (rather than silently closing the loop), and counts 429/504/503 by cause. Offered loads are fractions of a measured capacity probe.
+- **Open-loop service replay** (`hotshift loadtest`, `scripts/load_sweep.py`) dispatches on the trace timeline. It records dispatch lag, drops dispatches when the client's in-flight limit is hit (rather than silently closing the loop), and counts 429/504/503 by cause. Offered loads are fractions of a capacity measured by a stepped ramp after a warmup.
 
 ## Experiment matrix
 
@@ -49,7 +120,7 @@ Equal-budget cache modes (`no_cache`, `static`, `lru`, `decayed_lfu`, `adaptive`
 | `configs/sweep_cache.yaml` | Cache fractions 0.01, 0.05, 0.10, 0.25 |
 | `configs/sweep_dim32.yaml`, `configs/sweep_dim256.yaml` | D = 32 and D = 256 |
 | `configs/ablation.yaml` | Optimized engine vs preserved baselines (pageable staging, host re-copy admission) |
-| `scripts/load_sweep.py` | Offered load at 0.25 to 1.25 of the measured capacity, plus the overload trace |
+| `scripts/load_sweep.py` | Warmup, stepped ramp to the highest rate meeting the objective, then 0.25 to 1.25 of that rate, plus the overload trace |
 
 ## Artifacts
 

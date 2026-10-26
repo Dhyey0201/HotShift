@@ -1,7 +1,12 @@
 """Open-loop offered-load sweep against a running service (blueprint 17.4).
 
-First measures sustainable throughput with an overload trace, then offers fractions of that
-measured rate. Offered loads are derived from measurement, never from invented targets.
+Finds sustainable throughput with a stepped ramp, then offers fractions of that measured rate.
+Offered loads are derived from measurement, never from invented targets.
+
+The ramp warms the server first, then doubles the offered rate until a step misses its
+service objective: more than 1% of requests rejected, expired, failed, or dropped, or a p99
+above ``--slo-ms``. A step that meets the objective while its client dispatch lag p99 exceeds
+``--max-lag-ms`` stops the ramp as client-limited: the client, not the server, set the load.
 """
 
 from __future__ import annotations
@@ -22,26 +27,50 @@ parser.add_argument("--config", default="configs/demo.yaml")
 parser.add_argument("--url", default="http://127.0.0.1:8000")
 parser.add_argument("--requests", type=int, default=6000)
 parser.add_argument("--fractions", default="0.25,0.5,0.75,1.0,1.25")
+parser.add_argument("--start-rate", type=float, default=50.0)
+parser.add_argument("--max-rate", type=float, default=6400.0)
+parser.add_argument("--slo-ms", type=float, default=50.0)
+parser.add_argument("--max-lag-ms", type=float, default=20.0)
 parser.add_argument("--output", default="artifacts/traces/load")
 arguments = parser.parse_args()
 
 config = load_config(arguments.config)
 out = Path(arguments.output)
-probe_trace = out / "capacity-probe.jsonl"
-generate_trace(probe_trace, config.rows, requests=arguments.requests, history_length=32, seed=config.seed, scenario="stable", request_rate=50000.0)
-probe = run_loadtest(probe_trace, arguments.url, max_in_flight=512)
-summary = json.loads((probe / "summary.json").read_text())[0]
-capacity = summary["successful_throughput"]
-print(json.dumps({"capacity_probe_run": probe.name, "measured_successful_throughput": capacity}))
-if not capacity:
-    raise SystemExit("capacity probe completed no requests")
-for fraction in (float(value) for value in arguments.fractions.split(",")):
-    rate = capacity * fraction
-    trace = out / f"stable-load{fraction:.2f}.jsonl"
-    generate_trace(trace, config.rows, requests=arguments.requests, history_length=32, seed=config.seed, scenario="stable", request_rate=rate)
+
+
+def offer(name: str, rate: float, requests: int, scenario: str = "stable") -> dict:
+    trace = out / f"{name}.jsonl"
+    generate_trace(trace, config.rows, requests=requests, history_length=32, seed=config.seed, scenario=scenario, request_rate=rate)
     run = run_loadtest(trace, arguments.url, max_in_flight=512)
     result = json.loads((run / "summary.json").read_text())[0]
-    print(json.dumps({"fraction": fraction, "offered_rate": rate, "run": run.name, "successful": result["successful_requests"], "rejected": result["rejected_requests"], "p99_ms": result["client_latency_ms_p99"]}))
-overload = out / "overload.jsonl"
-generate_trace(overload, config.rows, requests=arguments.requests, history_length=32, seed=config.seed, scenario="overload", request_rate=capacity * 0.5)
-print(json.dumps({"overload_run": run_loadtest(overload, arguments.url, max_in_flight=512).name}))
+    unsuccessful = result["offered_requests"] - result["successful_requests"]
+    return {
+        "run": run.name, "offered_rate": rate, "offered": result["offered_requests"], "successful": result["successful_requests"],
+        "unsuccessful_fraction": unsuccessful / max(result["offered_requests"], 1), "rejected": result["rejected_requests"],
+        "dropped": result["dropped_dispatches"], "p99_ms": result["client_latency_ms_p99"], "lag_p99_ms": result["dispatch_lag_ms_p99"],
+    }
+
+
+# Warmup: first requests pay connection setup, allocator growth, and lazy CUDA initialization.
+print(json.dumps({"warmup": offer("warmup", arguments.start_rate, 500)}))
+capacity = None
+stop_reason = f"reached --max-rate {arguments.max_rate:g} without missing the objective"
+rate = arguments.start_rate
+while rate <= arguments.max_rate:
+    step = offer(f"ramp-{rate:g}", rate, int(min(max(rate * 10, 1000), 20000)))
+    print(json.dumps({"ramp": step}))
+    if step["unsuccessful_fraction"] > 0.01 or step["p99_ms"] is None or step["p99_ms"] > arguments.slo_ms:
+        stop_reason = f"objective missed at {rate:g} req/s"
+        break
+    # The objective held, but the client fell behind its schedule, so the offered rate is unproven.
+    if step["lag_p99_ms"] is not None and step["lag_p99_ms"] > arguments.max_lag_ms:
+        stop_reason = f"client-limited at {rate:g} req/s (dispatch lag p99 {step['lag_p99_ms']:.1f} ms)"
+        break
+    capacity = rate
+    rate *= 2
+print(json.dumps({"measured_capacity_rate": capacity, "slo_ms": arguments.slo_ms, "stop_reason": stop_reason}))
+if capacity is None:
+    raise SystemExit("the starting rate already missed the objective; lower --start-rate")
+for fraction in (float(value) for value in arguments.fractions.split(",")):
+    print(json.dumps({"fraction": fraction, **offer(f"stable-load{fraction:.2f}", capacity * fraction, arguments.requests)}))
+print(json.dumps({"overload": offer("overload", capacity * 0.5, arguments.requests, scenario="overload")}))

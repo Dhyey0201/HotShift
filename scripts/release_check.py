@@ -66,6 +66,46 @@ def gpu_evidence() -> bool:
     return record("full CUDA matrix with verified outputs", bool(full), ", ".join(full) or "no complete non-smoke CUDA run under artifacts/runs")
 
 
+def imported_gpu_evidence() -> bool:
+    """Accept GPU gates run elsewhere (for example Kaggle) when the tested code matches HEAD.
+
+    Requires the evidence log from ``scripts/gpu_evidence.sh`` to report every step passed, the
+    four sanitizer logs to be clean, and a full verified CUDA matrix whose commit has the same
+    ``src``, ``csrc``, and ``tests`` as this checkout.
+    """
+    log = ROOT / "artifacts" / "logs" / "gpu_evidence.log"
+    if not log.is_file():
+        return False
+    text = log.read_text(encoding="utf-8", errors="replace")
+    tests = re.findall(r"^(\d+) passed(?:, (\d+) skipped)?[^\n]*$", text, re.MULTILINE)
+    ok = record("imported GPU evidence log", "SUMMARY: all steps passed" in text and bool(tests) and not re.search(r"^\d+ failed", text, re.MULTILINE),
+                f"{log.relative_to(ROOT)}; test lines: {', '.join(t[0] + ' passed' for t in tests)}")
+    sanitizers = ROOT / "artifacts" / "sanitizers"
+    dirty = []
+    for tool in ("memcheck", "racecheck", "initcheck", "synccheck"):
+        path = sanitizers / f"{tool}.log"
+        content = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+        if not re.search(r"(ERROR SUMMARY: 0 errors|RACECHECK SUMMARY: 0 hazards)", content):
+            dirty.append(tool)
+    ok &= record("imported Compute Sanitizer logs", not dirty, ", ".join(dirty) or "memcheck, racecheck, initcheck, synccheck clean")
+    if not gpu_evidence():
+        return False
+    commits = set()
+    for path in (ROOT / "artifacts" / "runs").glob("*-cuda-*"):
+        if is_complete_run(path):
+            manifest = json.loads((path / "manifest.json").read_text())
+            if not manifest.get("smoke") and not manifest.get("git_dirty"):
+                commits.add(manifest.get("git_commit"))
+    matching = [
+        commit for commit in commits if commit and subprocess.run(
+            ["git", "diff", "--quiet", commit, "HEAD", "--", "src", "csrc", "tests"], cwd=ROOT, check=False,
+        ).returncode == 0
+    ]
+    ok &= record("imported evidence matches tested code", bool(matching),
+                 f"src, csrc, tests unchanged since {', '.join(c[:12] for c in matching)}" if matching else f"code changed since {', '.join(sorted(c[:12] for c in commits if c))}")
+    return ok
+
+
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (ROOT / name).exists()]
     record("required files", not missing, ", ".join(missing))
@@ -75,8 +115,11 @@ def main() -> int:
     run("frontend unit tests", ["npm", "run", "test", "--prefix", "frontend"])
     run("frontend production build", ["npm", "run", "build", "--prefix", "frontend"])
     gpu = preflight("cuda")
-    blocked = gpu["cuda_status"] != "available"
-    if blocked:
+    local_cuda = gpu["cuda_status"] == "available"
+    blocked = not local_cuda
+    if blocked and imported_gpu_evidence():
+        blocked = False
+    elif blocked:
         record("CUDA gates", False, f"BLOCKED: {gpu['cuda_block_reason']}")
     else:
         run("build extension", [sys.executable, "-m", "hotshift.cli", "build-extension"])
@@ -87,7 +130,8 @@ def main() -> int:
     summary = {
         "generated_utc": datetime.now(UTC).isoformat(),
         **git_state(),
-        "environment": environment(include_cuda=not blocked),
+        "environment": environment(include_cuda=local_cuda),
+        "gpu_evidence": "local" if local_cuda else ("imported" if not blocked else "missing"),
         "cuda_status": gpu["cuda_status"],
         "checks": results,
         "commands": ["python3 scripts/release_check.py", "bash scripts/gpu_evidence.sh"],

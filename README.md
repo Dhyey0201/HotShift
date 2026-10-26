@@ -25,7 +25,9 @@ Cache modes: `no_cache`, `static` (fixed set from a warmup prefix), `lru`, `deca
 
 ## Status
 
-All CPU-side milestones are implemented and validated locally: data, reference, policies, traces, replay, benchmarks, service, dashboard, Docker CPU stack, and 109 Python plus 16 frontend tests. The CUDA code was rewritten after the earlier Kaggle validation (pinned staging, an owned row-scatter kernel, O(batch) slot management), so **the GPU gates must be rerun** before the release is complete. One command does it on an NVIDIA host: `bash scripts/gpu_evidence.sh` (see [docs/KAGGLE.md](docs/KAGGLE.md)). [docs/STATUS.md](docs/STATUS.md) maps every requirement to its evidence, and [docs/RELEASE.md](docs/RELEASE.md) tracks the release checklist.
+Every milestone is implemented and validated. On a Tesla T4 (Kaggle), 157 tests pass with no CUDA skips, Compute Sanitizer finds no errors or hazards, and the full benchmark matrix, ablation, and sweeps completed with every output verified. `scripts/release_check.py` passes against that evidence.
+
+**Main finding:** on the T4, the bounded cache uses 8× less GPU memory than a full-table copy (64.5 MB vs 512 MB) and cuts host→device traffic by up to 75%. It does not raise throughput, though: only the static cache beats no caching (+9% to +17% at batch 16–64), and the LRU, decayed-frequency, and adaptive policies are 1.2× to 4.8× slower than no caching, because their Python bookkeeping costs more than the transfers they save. The adaptive policy recovers from an abrupt shift 10× slower than LRU. Details and run IDs are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/PERFORMANCE.md](docs/PERFORMANCE.md). To reproduce, run `bash scripts/gpu_evidence.sh` on an NVIDIA host (see [docs/KAGGLE.md](docs/KAGGLE.md)). [docs/STATUS.md](docs/STATUS.md) maps every requirement to its evidence, and [docs/RELEASE.md](docs/RELEASE.md) tracks the release checklist.
 
 ## Quick start (CPU development mode)
 

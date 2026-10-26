@@ -1,63 +1,52 @@
 # HotShift implementation status
 
-Updated 2026-10-25.
+Updated 2026-10-26.
 
 ## Summary
 
-Every milestone is implemented. Everything that can run without an NVIDIA GPU has been run and passes:
+Every milestone is implemented and validated, on the CPU locally and on a Tesla T4 (Kaggle, CUDA 12.8, PyTorch 2.11) at commit `57cbca1`:
 
-- 109 Python tests: 87 CPU and integration tests plus 22 CUDA-engine host-logic tests using the operator shim.
-- 11 frontend unit tests and 5 Playwright tests against the real CPU API.
-- The production frontend build, ruff, the CPU smoke benchmark and report, and the Docker Compose CPU stack (health checks, recommendations through the dashboard proxy, and a clean SIGTERM exit 0).
+- Locally: 110 Python tests, 11 frontend unit tests, 5 Playwright tests against the real CPU API, the production frontend build, ruff, and the Docker Compose CPU stack.
+- On the T4: 157 tests with `HOTSHIFT_REQUIRE_CUDA=1` and no CUDA skips. Compute Sanitizer memcheck, racecheck, initcheck, and synccheck are clean. The standard matrix, ablation, cache-fraction sweep, dimension sweeps, kernel microbenchmark, and `torch.profiler` capture are complete, with every output check passing.
+- `python3 scripts/release_check.py` passes, accepting that imported evidence because `src`, `csrc`, and `tests` are unchanged since the tested commit.
 
-The CUDA engine was substantially rewritten after the earlier Kaggle run. Changes include pinned staging, the new `scatter_rows_` kernel, the maintenance transaction, gradient guards, and O(batch) bookkeeping. **The earlier Kaggle pass (27 tests, all four sanitizer tools clean, Tesla T4) therefore does not cover the current code.** Each GPU-dependent item below is `blocked` until `bash scripts/gpu_evidence.sh` has run on an NVIDIA host.
+The measured result is unfavorable to the dynamic policies: on the T4 they are slower than no caching (see [BENCHMARKS.md](BENCHMARKS.md) and [PERFORMANCE.md](PERFORMANCE.md) P5).
 
 ## Requirement map
 
 | ID | Requirement | State | Evidence or remaining gate |
 | --- | --- | --- | --- |
-| R01 | Correct mean pooling | in_progress | CPU: `pytest tests/cpu/test_pooling.py` (hand fixture, Torch oracle, Hypothesis, FP64 extremes). GPU: `tests/cuda/test_operators.py` must pass on the current code |
-| R02 | Custom CUDA operations | in_progress | `csrc/` probe, gather, pool, scatter, mapping kernels; `tests/cuda`; sanitizer logs under `artifacts/sanitizers` (rerun required) |
-| R03 | Bounded GPU cache | in_progress | Memory accounting in `/api/v1/status` and every summary; capacity tests in the host-logic shim pass; `tests/cuda/test_cache_engine.py` (U > C, max batch, memory stability) must run on a GPU |
-| R04 | Safe slot reuse | in_progress | Maintenance protocol in ARCHITECTURE; randomized invariants pass under the shim; GPU randomized, stalled-stream, and sanitizer runs pending |
-| R05 | Adaptive behavior | in_progress | Policy property tests pass; recovery and detection metrics implemented; abrupt-shift GPU results pending |
-| R06 | Fair comparison | in_progress | Shared trace checksums, identical partitions, budgets in manifests, rotated order, baselines; `configs/benchmark.yaml` run pending |
-| R07 | Bounded serving | complete (CPU) | `pytest tests/cpu/test_scheduler.py tests/integration`: queue full, timeout, cancellation before and after launch, exclusive drain, unhealthy engine, shutdown. GPU concurrent test `tests/cuda/test_cuda_api.py` pending |
-| R08 | Actual live dashboard | complete (CPU) | `npm run test:e2e --prefix frontend` with a real API; `docs/dashboard.png`. Optional GPU journey and demo recording pending |
-| R09 | Reproducible build | in_progress | `requirements/cpu-py311-linux.lock`, `frontend/package-lock.json`, CPU Docker image pinned by digest and validated. `Dockerfile.cuda` digest pin pending GPU validation |
-| R10 | Performance explanation | blocked | `docs/PERFORMANCE.md` hypotheses P1 to P4 with preserved baselines; needs the `ablation`, `bench-kernels`, and `profile-torch` runs |
-| R11 | Honest reporting | complete | Claim scan in `scripts/release_check.py`; the report lists unfavorable cases automatically; null-with-reason measurements |
-| R12 | Usable handoff | complete | README, ARCHITECTURE, DEVELOPMENT, BENCHMARKS, DECISIONS, PERFORMANCE, DEMO, RELEASE, KAGGLE; `scripts/release_check.py` writes `artifacts/release/release_summary.json` |
+| R01 | Correct mean pooling | complete | `tests/cpu/test_pooling.py`; `tests/cuda/test_operators.py` on the T4; max abs error 0 in `20261026T013214Z-kernels-2a46fa6b` |
+| R02 | Custom CUDA operations | complete | `csrc/` probe, gather, pool, scatter, mapping kernels; `tests/cuda`; clean logs in `artifacts/sanitizers/` |
+| R03 | Bounded GPU cache | complete | 64.5 MB device memory for every cache mode vs 512 MB full-table reference, in every summary's `memory` |
+| R04 | Safe slot reuse | complete | Maintenance protocol in ARCHITECTURE; randomized GPU invariants and racecheck/synccheck clean on the T4 |
+| R05 | Adaptive behavior | complete (measured, unfavorable) | Shift detection and bounded budgets work; abrupt recovery 20,000 requests vs LRU 2,000 (`20261026T013249Z-cuda-67ce68c2`) |
+| R06 | Fair comparison | complete | Shared trace checksums, identical partitions, budgets in manifests, rotated order, both baselines |
+| R07 | Bounded serving | complete | `tests/cpu/test_scheduler.py`, `tests/integration`, and `tests/cuda/test_cuda_api.py` on the T4 (the latter found and fixed the backlog batching bug in `57cbca1`) |
+| R08 | Actual live dashboard | complete (CPU) | `npm run test:e2e --prefix frontend`; `docs/dashboard.png`. A GPU-backed recording is optional |
+| R09 | Reproducible build | in_progress | Locks and the CPU image pinned by digest. `Dockerfile.cuda` not yet built or pinned |
+| R10 | Performance explanation | complete | PERFORMANCE P1 to P4 measured; P5 names the host-side bottleneck and the next experiment |
+| R11 | Honest reporting | complete | Claim scan; unfavorable cases lead BENCHMARKS; the invalid load probe is reported as invalid |
+| R12 | Usable handoff | complete | README, ARCHITECTURE, DEVELOPMENT, BENCHMARKS, DECISIONS, PERFORMANCE, DEMO, RELEASE, KAGGLE; `artifacts/release/release_summary.json` |
 
 ## Milestones
 
 | Milestone | State |
 | --- | --- |
-| 0 Repository and environment | complete (deep preflight distinguishes available, unavailable, and restricted profiling) |
+| 0 Repository and environment | complete |
 | 1 Dataset and CPU reference | complete |
-| 2 Extension and GPU operators | implemented; GPU rerun pending |
-| 3 Bounded cache engine | implemented; host logic validated; GPU rerun pending |
+| 2 Extension and GPU operators | complete (T4) |
+| 3 Bounded cache engine | complete (T4) |
 | 4 Policies and traces | complete |
-| 5 Benchmark foundation | implemented; first full GPU comparison pending |
-| 6 Serving and scheduling | complete on CPU; one GPU concurrency test pending |
+| 5 Benchmark foundation | complete; full GPU comparison recorded |
+| 6 Serving and scheduling | complete; GPU capacity sweep needs a rerun |
 | 7 Music demo and dashboard | complete on CPU |
-| 8 Profiling and optimization | blocked on GPU measurements |
-| 9 Evidence and release | blocked on milestones 2, 5, and 8 GPU runs |
-
-## Next exact commands
-
-On an NVIDIA host (Kaggle cells in [KAGGLE.md](KAGGLE.md)):
-
-```bash
-python3 -m pip install -e '.[dev,service]'
-bash scripts/gpu_evidence.sh --quick      # gates: tests with zero CUDA skips, sanitizers, smoke, kernels, profile
-bash scripts/gpu_evidence.sh              # full evidence: matrix, sweeps, ablation, load sweep (hours)
-```
-
-Then copy the evidence archive back, extract it into `artifacts/`, run `python3 -m hotshift.cli report --runs artifacts/runs`, record results in BENCHMARKS.md and PERFORMANCE.md, and run `python3 scripts/release_check.py`.
+| 8 Profiling and optimization | P1 to P4 measured; P5 open |
+| 9 Evidence and release | release check passes |
 
 ## Known issues
 
-- Not yet executed on a GPU: the new `scatter_rows_` kernel, the gradient checks in `pool.cu` and `gather.cu`, and every CUDA test written for the rewritten engine. A compile or test failure there is the first thing to fix.
-- `Dockerfile.cuda` has not been built. Its base image tag must be validated and pinned by digest.
-- Smoke-size traces never complete a policy window, so adaptive behavior is only meaningful in full-size runs.
+- **Load sweep capacity not established.** The first capacity probe flooded a cold server and was invalid. `scripts/load_sweep.py` now warms up and ramps; rerun with `bash scripts/gpu_evidence.sh --load` (Kaggle cell 3 in [KAGGLE.md](KAGGLE.md)).
+- **Dynamic policies are slower than no caching on the T4.** Python policy and maintenance work dominates (PERFORMANCE P5).
+- `Dockerfile.cuda` has not been built; its base image must be validated and pinned by digest.
+- Nsight Compute is denied on Kaggle (`ERR_NVGPUCTRPERM`); profiling evidence is `torch.profiler` only.

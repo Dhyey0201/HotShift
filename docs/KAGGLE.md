@@ -41,14 +41,28 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[dev,servi
 subprocess.run(["bash", "scripts/gpu_evidence.sh"], check=True)
 ```
 
+## Cell 3: load sweep only (about 15 minutes)
+
+Reruns just the open-loop load sweep (warmup, stepped capacity ramp, offered-load fractions, overload) against a CUDA server. It writes its own log, `artifacts/logs/gpu_evidence-load.log`, so it never replaces the gate evidence.
+
+```python
+import os, subprocess, sys
+BRANCH = "complete-gpu-evidence"
+os.chdir("/kaggle/working/HotShift")
+subprocess.run(["git", "fetch", "origin", BRANCH], check=True)
+subprocess.run(["git", "checkout", "-B", BRANCH, f"origin/{BRANCH}"], check=True)
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[dev,service]"], check=True)
+subprocess.run(["bash", "scripts/gpu_evidence.sh", "--load"], check=True)
+```
+
 ## Bringing results back
 
-Both modes finish with `artifacts/hotshift-gpu-evidence-<timestamp>.tar.gz` (raw traces are excluded because they are regenerable from the seeds in each manifest). Download it from the notebook's output panel, then locally:
+Every mode finishes with `artifacts/hotshift-gpu-evidence-<timestamp>.tar.gz` (raw traces are excluded because they are regenerable from the seeds in each manifest). Download it from the notebook's output panel, then locally:
 
 ```bash
 tar -xzf hotshift-gpu-evidence-*.tar.gz        # restores artifacts/runs, profiles, sanitizers, logs
 python3 -m hotshift.cli report --runs artifacts/runs
-python3 scripts/release_check.py               # CPU checks plus the full-CUDA-run evidence check
+python3 scripts/release_check.py               # CPU checks plus validation of the imported GPU evidence
 ```
 
 Then copy the measured results, with run IDs, into `docs/BENCHMARKS.md` and `docs/PERFORMANCE.md`, and commit small summaries (manifest, summary, aggregate, and REPORT) as representative evidence.
