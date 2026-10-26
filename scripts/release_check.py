@@ -66,6 +66,20 @@ def gpu_evidence() -> bool:
     return record("full CUDA matrix with verified outputs", bool(full), ", ".join(full) or "no complete non-smoke CUDA run under artifacts/runs")
 
 
+def resolve_commit(commit: str) -> str | None:
+    """Return ``commit`` if it exists, else its rewritten ID from a ``git filter-repo`` commit map."""
+    exists = subprocess.run(["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=ROOT, check=False, capture_output=True)
+    if exists.returncode == 0:
+        return commit
+    commit_map = ROOT / ".git" / "filter-repo" / "commit-map"
+    if commit_map.is_file():
+        for line in commit_map.read_text(encoding="utf-8").splitlines():
+            old, _, new = line.partition(" ")
+            if old == commit and new.strip("0"):
+                return new
+    return None
+
+
 def imported_gpu_evidence() -> bool:
     """Accept GPU gates run elsewhere (for example Kaggle) when the tested code matches HEAD.
 
@@ -97,8 +111,8 @@ def imported_gpu_evidence() -> bool:
             if not manifest.get("smoke") and not manifest.get("git_dirty"):
                 commits.add(manifest.get("git_commit"))
     matching = [
-        commit for commit in commits if commit and subprocess.run(
-            ["git", "diff", "--quiet", commit, "HEAD", "--", "src", "csrc", "tests"], cwd=ROOT, check=False,
+        commit for commit in commits if commit and (resolved := resolve_commit(commit)) and subprocess.run(
+            ["git", "diff", "--quiet", resolved, "HEAD", "--", "src", "csrc", "tests"], cwd=ROOT, check=False,
         ).returncode == 0
     ]
     ok &= record("imported evidence matches tested code", bool(matching),

@@ -2,7 +2,7 @@
 
 ## Current evidence
 
-All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 580.178.04, CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.13) at commit `57cbca1`, with a clean tree. The raw directories are in `artifacts/runs/` (not committed; regenerate with `bash scripts/gpu_evidence.sh`), and `artifacts/runs/REPORT.md` holds every row.
+All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 580.178.04, CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.13) at commit `f395eef` (recorded in run manifests as `57cbca1`, its ID before the history rewrite that removed the blueprint), with a clean tree. The raw directories are in `artifacts/runs/` (not committed; regenerate with `bash scripts/gpu_evidence.sh`), and `artifacts/runs/REPORT.md` holds every row.
 
 | Evidence | Status | Run |
 | --- | --- | --- |
