@@ -2,7 +2,7 @@
 
 ## Current evidence
 
-All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 580.178.04, CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.13) at commit `f395eef` (recorded in run manifests as `57cbca1`, its ID before a history rewrite), with a clean tree. Run summaries, logs, and the full generated report are committed in [evidence/t4-2026-10-26/](../evidence/t4-2026-10-26/); its [REPORT.md](../evidence/t4-2026-10-26/REPORT.md) holds every row. Large per-sample files are omitted and regenerable with `bash scripts/gpu_evidence.sh`.
+All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 580.178.04, CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.13) at commit `4232294` (recorded in run manifests as `57cbca1`, its ID before a history rewrite), with a clean tree. Run summaries, logs, and the full generated report are committed in [evidence/t4-2026-10-26/](../evidence/t4-2026-10-26/); its [REPORT.md](../evidence/t4-2026-10-26/REPORT.md) holds every row. Large per-sample files are omitted and regenerable with `bash scripts/gpu_evidence.sh`.
 
 | Evidence | Status | Run |
 | --- | --- | --- |

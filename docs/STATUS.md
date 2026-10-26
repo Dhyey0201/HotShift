@@ -4,7 +4,7 @@ Updated 2026-10-26.
 
 ## Summary
 
-Every milestone is implemented and validated, on the CPU locally and on a Tesla T4 (Kaggle, CUDA 12.8, PyTorch 2.11) at commit `f395eef` (`57cbca1` in run manifests, before the history rewrite):
+Every milestone is implemented and validated, on the CPU locally and on a Tesla T4 (Kaggle, CUDA 12.8, PyTorch 2.11) at commit `4232294` (`57cbca1` in run manifests, before the history rewrite):
 
 - Locally: 110 Python tests, 11 frontend unit tests, 5 Playwright tests against the real CPU API, the production frontend build, ruff, and the Docker Compose CPU stack.
 - On the T4: 157 tests with `HOTSHIFT_REQUIRE_CUDA=1` and no CUDA skips. Compute Sanitizer memcheck, racecheck, initcheck, and synccheck are clean. The standard matrix, ablation, cache-fraction sweep, dimension sweeps, kernel microbenchmark, and `torch.profiler` capture are complete, with every output check passing.
@@ -22,7 +22,7 @@ The measured result is unfavorable to the dynamic policies: on the T4 they are s
 | R04 | Safe slot reuse | complete | Maintenance protocol in ARCHITECTURE; randomized GPU invariants and racecheck/synccheck clean on the T4 |
 | R05 | Adaptive behavior | complete (measured, unfavorable) | Shift detection and bounded budgets work; abrupt recovery 20,000 requests vs LRU 2,000 (`20261026T013249Z-cuda-67ce68c2`) |
 | R06 | Fair comparison | complete | Shared trace checksums, identical partitions, budgets in manifests, rotated order, both baselines |
-| R07 | Bounded serving | complete | `tests/cpu/test_scheduler.py`, `tests/integration`, and `tests/cuda/test_cuda_api.py` on the T4 (the latter found and fixed the backlog batching bug in `f395eef`) |
+| R07 | Bounded serving | complete | `tests/cpu/test_scheduler.py`, `tests/integration`, and `tests/cuda/test_cuda_api.py` on the T4 (the latter found and fixed the backlog batching bug in `4232294`) |
 | R08 | Actual live dashboard | complete (CPU) | `npm run test:e2e --prefix frontend`; `docs/dashboard.png`. A GPU-backed recording is optional |
 | R09 | Reproducible build | in_progress | Locks and the CPU image pinned by digest. `Dockerfile.cuda` not yet built or pinned |
 | R10 | Performance explanation | complete | PERFORMANCE P1 to P4 measured; P5 names the host-side bottleneck and the next experiment |
