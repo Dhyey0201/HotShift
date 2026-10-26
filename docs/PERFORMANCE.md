@@ -1,6 +1,6 @@
 # Performance log
 
-Each entry records a hypothesis, the baseline, the change, the correctness result, and the measurement. Entries without GPU measurements are marked **pending** and must not be cited as improvements. Measurements below are from a Tesla T4 at commit `f395eef` (`57cbca1` in run manifests, before the history rewrite); run IDs refer to `artifacts/runs/`.
+Each entry records a hypothesis, the baseline, the change, the correctness result, and the measurement. Entries without GPU measurements are marked **pending** and must not be cited as improvements. Measurements below are from a Tesla T4 at commit `f395eef` (`57cbca1` in run manifests, before the history rewrite); run IDs refer to [evidence/t4-2026-10-26/runs/](../evidence/t4-2026-10-26/runs/).
 
 ## P1: Per-batch work proportional to cache size (code analysis)
 

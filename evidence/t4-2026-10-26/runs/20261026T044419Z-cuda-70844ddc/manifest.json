@@ -1,0 +1,195 @@
+{
+  "backend": "cuda",
+  "cache_budget_bytes": 12800000,
+  "cache_fractions": [
+    0.1
+  ],
+  "command": [
+    "cli.py",
+    "bench-cuda",
+    "--matrix",
+    "configs/sweep_dim32.yaml"
+  ],
+  "configuration": {
+    "benchmark": {
+      "baselines": [
+        "torch_gpu_resident"
+      ],
+      "history_length": 32,
+      "microbatch_sizes": [
+        16
+      ],
+      "policies": [
+        "no_cache",
+        "lru",
+        "adaptive"
+      ],
+      "repeats": 3,
+      "requests": 50000,
+      "scenarios": [
+        "stable",
+        "abrupt"
+      ]
+    },
+    "cache": {
+      "capacity": 100000,
+      "policy": "adaptive"
+    },
+    "data": {
+      "dimensions": 32,
+      "output_dir": "artifacts/data/standard_d32",
+      "rows": 1000000,
+      "seed": 42
+    },
+    "limits": {
+      "max_batch_delay_ms": 2.0,
+      "max_batch_ids": 16384,
+      "max_batch_requests": 64,
+      "max_history_ids": 256,
+      "queue_capacity": 1024
+    },
+    "profile": "sweep_dim32"
+  },
+  "configured_cache_capacity": 100000,
+  "dataset_sha256": "a1d06129facb15dbbdbad64d87ca34c5438268f2727c60b535ea3e4eca54a6b7",
+  "dataset_version": "synthetic-v1",
+  "dimensions": 32,
+  "environment": {
+    "driver": "580.178.04",
+    "gpu": "Tesla T4",
+    "gpu_capability": [
+      7,
+      5
+    ],
+    "gpu_total_memory_bytes": 15636037632,
+    "host_memory_total_bytes": 33658155008,
+    "numpy": "2.1.3",
+    "nvcc": "Build cuda_12.8.r12.8/compiler.35583870_0",
+    "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python": "3.13.15",
+    "torch": "2.11.0+cu128",
+    "torch_cuda": "12.8"
+  },
+  "git_commit": "57cbca19aee29b37ae9fb11f79f9c3c057621e3b",
+  "git_dirty": false,
+  "limitations": [
+    "measurements apply only to the recorded hardware, driver, toolkit, data, and workload",
+    "no speedup is claimed without repeated matched-baseline analysis",
+    "CPU backend runs a cache simulator; its hit rates are policy semantics, not GPU performance"
+  ],
+  "memory_by_engine": {
+    "adaptive": {
+      "allocator_allocated_bytes": 19758592,
+      "allocator_peak_allocated_bytes": 19763712,
+      "allocator_peak_reserved_bytes": 23068672,
+      "allocator_reserved_bytes": 23068672,
+      "device_cache_rows_bytes": 12800000,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 2957832,
+      "device_tensor_bytes": 19757832,
+      "host_slot_mirror_bytes": 800000,
+      "host_staging_bytes": 2957832,
+      "host_staging_pinned": true,
+      "host_table_bytes": 128000000
+    },
+    "lru": {
+      "allocator_allocated_bytes": 19758592,
+      "allocator_peak_allocated_bytes": 19763712,
+      "allocator_peak_reserved_bytes": 23068672,
+      "allocator_reserved_bytes": 23068672,
+      "device_cache_rows_bytes": 12800000,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 2957832,
+      "device_tensor_bytes": 19757832,
+      "host_slot_mirror_bytes": 800000,
+      "host_staging_bytes": 2957832,
+      "host_staging_pinned": true,
+      "host_table_bytes": 128000000
+    },
+    "no_cache": {
+      "allocator_allocated_bytes": 6958592,
+      "allocator_peak_allocated_bytes": 6963712,
+      "allocator_peak_reserved_bytes": 23068672,
+      "allocator_reserved_bytes": 23068672,
+      "device_cache_rows_bytes": 0,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 2957832,
+      "device_tensor_bytes": 6957832,
+      "host_slot_mirror_bytes": 0,
+      "host_staging_bytes": 2957832,
+      "host_staging_pinned": true,
+      "host_table_bytes": 128000000
+    },
+    "torch_gpu_resident": {
+      "allocator_allocated_bytes": 128000000,
+      "allocator_peak_allocated_bytes": 128025600,
+      "allocator_peak_reserved_bytes": 132120576,
+      "allocator_reserved_bytes": 132120576,
+      "device_table_bytes": 128000000,
+      "device_tensor_bytes": 128000000,
+      "host_table_bytes": 128000000
+    }
+  },
+  "policy_mode": "serialized CUDA cache execution with deterministic offline replay",
+  "release_eligible": true,
+  "rows": 1000000,
+  "run_id": "20261026T044419Z-cuda-70844ddc",
+  "sample_counts": {
+    "batch_samples": 76800,
+    "summaries": 24,
+    "windows": 2400
+  },
+  "schema_version": 2,
+  "selected_matrix": {
+    "baselines": [
+      "torch_gpu_resident"
+    ],
+    "cache_conditions": [
+      "warm"
+    ],
+    "cache_fractions": [],
+    "engine_variants": [
+      "optimized"
+    ],
+    "history_length": 32,
+    "microbatch_sizes": [
+      16
+    ],
+    "policies": [
+      "no_cache",
+      "lru",
+      "adaptive"
+    ],
+    "repeats": 3,
+    "requests": 50000,
+    "scenarios": [
+      "stable",
+      "abrupt"
+    ],
+    "verify_every": 50,
+    "window_requests": 500
+  },
+  "smoke": false,
+  "timestamp_utc": "2026-10-26T04:47:01.392705+00:00",
+  "timing_notes": [
+    "batch_wall_ms spans one engine call: host planning, transfers, synchronization, kernels, policy update, and maintenance",
+    "device_ms is a CUDA event interval on the current stream around the engine call; it includes idle gaps while the host plans",
+    "request_throughput divides measured requests by summed batch wall time and excludes trace parsing",
+    "this serialized implementation does not overlap host planning with GPU work",
+    "per-request latency in offline replay equals its batch wall time; batch_samples.csv.gz is the documented requests.csv equivalent"
+  ],
+  "trace_sha256": {
+    "abrupt-seed42": "99fbc080dc360c1cfd02888149b734a61ae92a49ea705ae7af861c0fbd4178d7",
+    "abrupt-seed43": "0b410c16e2f225fdc86062857fa10318f3d3650c23f9ad32807a1cbc696704e8",
+    "abrupt-seed44": "123db201c07d558b4824587331fe0b1078264aadd6bebf18a45bafcf0b572b27",
+    "post_shift-seed42": "de20b04449b46332a73d367eb4bcb79cb292e093bac416a4d9ce140af88001ac",
+    "post_shift-seed43": "f9f7bc5917bc4914f8581542b51e19775872193f06d7fecedf8f47456f3e2368",
+    "post_shift-seed44": "e8bff8d9e736d1db348affb5c2a44cad2fdcbd6a4b6b5714aa58afcf0b6b77b8",
+    "stable-seed42": "7423f1653e9feeec3836a742ae6e72cfe4f810aa8ff568db71aa267ab9f9974c",
+    "stable-seed43": "5d45c60de343c3db30c1f6c7f30e77a3624c972373a0d47ed14b5d0ff48180d8",
+    "stable-seed44": "dc6f0c36bdc025afc25e71a11d84ad675cf819a0305025289e7406c132ebd096"
+  },
+  "warnings": [],
+  "window_requests": 500
+}

@@ -2,19 +2,19 @@
 
 ## Current evidence
 
-All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 580.178.04, CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.13) at commit `f395eef` (recorded in run manifests as `57cbca1`, its ID before the history rewrite that removed the blueprint), with a clean tree. The raw directories are in `artifacts/runs/` (not committed; regenerate with `bash scripts/gpu_evidence.sh`), and `artifacts/runs/REPORT.md` holds every row.
+All GPU evidence below comes from one Kaggle session on a **Tesla T4** (driver 580.178.04, CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.13) at commit `f395eef` (recorded in run manifests as `57cbca1`, its ID before a history rewrite), with a clean tree. Run summaries, logs, and the full generated report are committed in [evidence/t4-2026-10-26/](../evidence/t4-2026-10-26/); its [REPORT.md](../evidence/t4-2026-10-26/REPORT.md) holds every row. Large per-sample files are omitted and regenerable with `bash scripts/gpu_evidence.sh`.
 
 | Evidence | Status | Run |
 | --- | --- | --- |
-| CUDA tests with `HOTSHIFT_REQUIRE_CUDA=1` | 157 passed; the 2 skips are CPU-only tests that skip when a GPU is present | `artifacts/logs/gpu_evidence.log` |
-| Compute Sanitizer (memcheck, racecheck, initcheck, synccheck) | 0 errors, 0 hazards on all 45 operator and engine tests | `artifacts/sanitizers/` |
+| CUDA tests with `HOTSHIFT_REQUIRE_CUDA=1` | 157 passed; the 2 skips are CPU-only tests that skip when a GPU is present | `evidence/t4-2026-10-26/logs/gpu_evidence.log` |
+| Compute Sanitizer (memcheck, racecheck, initcheck, synccheck) | 0 errors, 0 hazards on all 45 operator and engine tests | `evidence/t4-2026-10-26/sanitizers/` |
 | Standard matrix (1M × 128, C/N = 0.10, 3 seeds, 100k requests) | Complete; every output check passed | `20261026T013249Z-cuda-67ce68c2` |
 | Ablation (staging and admission baselines) | Complete | `20261026T041525Z-cuda-cf672a53` |
 | Cache-fraction sweep | Complete | `20261026T043300Z-cuda-a80b131d` |
 | Dimension sweeps D = 32 and D = 256 | Complete | `20261026T044419Z-cuda-70844ddc`, `20261026T044721Z-cuda-f852b250` |
 | Kernel microbenchmark | Complete | `20261026T013214Z-kernels-2a46fa6b` |
-| `torch.profiler` capture | Complete; Nsight Compute denied by the host (`ERR_NVGPUCTRPERM`) | `artifacts/profiles/20261026T013217Z-torchprof-5639e316` |
-| Open-loop load sweep | Complete: sustains 250 req/s, fails at 400 req/s | `20261026T060043Z-load-2c5689b9` … `20261026T060646Z-load-a3d5c6d9` (the earlier `20261026T045029Z` … `050224Z` sweep used an invalid probe and is superseded) |
+| `torch.profiler` capture | Complete; Nsight Compute denied by the host (`ERR_NVGPUCTRPERM`) | `evidence/t4-2026-10-26/profile/` (`20261026T013217Z-torchprof-5639e316`) |
+| Open-loop load sweep | Complete: sustains 250 req/s, fails at 400 req/s | `evidence/t4-2026-10-26/load_sweep.jsonl` (runs `20261026T060043Z` … `060646Z`; an earlier sweep used an invalid probe and is superseded) |
 
 ## Results (Tesla T4)
 

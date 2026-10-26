@@ -1,0 +1,33 @@
+{
+  "backend": "cuda",
+  "batch_size": 16,
+  "environment": {
+    "driver": "580.178.04",
+    "gpu": "Tesla T4",
+    "gpu_capability": [
+      7,
+      5
+    ],
+    "gpu_total_memory_bytes": 15636037632,
+    "host_memory_total_bytes": 33658155008,
+    "numpy": "2.1.3",
+    "nvcc": "Build cuda_12.8.r12.8/compiler.35583870_0",
+    "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python": "3.13.15",
+    "torch": "2.11.0+cu128",
+    "torch_cuda": "12.8"
+  },
+  "git_commit": "57cbca19aee29b37ae9fb11f79f9c3c057621e3b",
+  "git_dirty": false,
+  "kind": "torch_profiler_capture",
+  "notes": [
+    "torch.profiler uses CUPTI activity tracing, which does not require GPU performance-counter permission",
+    "profiler-instrumented timings are diagnostic and are not used as headline benchmark numbers"
+  ],
+  "policy": "lru",
+  "release_eligible": true,
+  "requests": 2048,
+  "run_id": "20261026T013217Z-torchprof-5639e316",
+  "schema_version": 2
+}

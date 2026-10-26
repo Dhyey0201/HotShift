@@ -1,0 +1,141 @@
+{
+  "replay": {
+    "admissions": 19264,
+    "batch_sample_count": 114,
+    "batch_wall_ms_p50": 2.334704999839232,
+    "batch_wall_ms_p95": 2.663580400098908,
+    "batch_wall_ms_p99": 2.7917443698152056,
+    "cancelled_requests": 0,
+    "d2h_bytes": 361548,
+    "device_ms_p50": null,
+    "device_ms_p95": null,
+    "device_ms_p99": null,
+    "evictions": 19264,
+    "expired_requests": 0,
+    "failed_requests": 0,
+    "h2d_bytes": 4580332,
+    "host_miss_bytes": 2465792,
+    "measured_requests": 1639,
+    "null_reasons": {
+      "device_ms": "no device timer for this backend"
+    },
+    "occurrence_hit_rate": 0.7699951150190958,
+    "occurrence_hits": 69355,
+    "occurrences": 90072,
+    "offered_requests": 1639,
+    "policy_overhead_ms": 131.75210400277138,
+    "rejected_requests": 0,
+    "request_throughput": 6229.886735551587,
+    "stage_ms_p50": {
+      "deduplicate_ms": 0.2882920000502054,
+      "maintenance_ms": 0.723374499784768,
+      "pack_ms": 0.09907750018101069,
+      "policy_ms": 0.45688000000154716,
+      "probe_ms": 0.29539249999288586,
+      "transfer_pool_output_ms": 0.4260519999661483
+    },
+    "stage_ms_total": {
+      "deduplicate_ms": 32.69741599888221,
+      "maintenance_ms": 82.22331800197935,
+      "pack_ms": 11.848347997784003,
+      "policy_ms": 49.528786000792024,
+      "probe_ms": 34.14817599878006,
+      "transfer_pool_output_ms": 49.29360200139854
+    },
+    "successful_requests": 1639,
+    "throughput_scope": "measured requests divided by summed batch wall time; excludes trace parsing and inter-batch gaps",
+    "unique_hit_rate": 0.4922375392076755,
+    "unique_hits": 18675,
+    "unique_ids": 37939,
+    "useful_lookup_ids_per_second": 342366.2953292267,
+    "wall_seconds": 0.263086645002204,
+    "warmup_requests": 409,
+    "warmup_wall_ms": 71.33670000030179
+  },
+  "stages": [
+    {
+      "count": 143,
+      "cpu_time_total_us": 15044.010999999871,
+      "device_time_total_us": 0.0,
+      "name": "hotshift.deduplicate"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 26927.238000000143,
+      "device_time_total_us": 876.2109999995719,
+      "name": "hotshift.probe"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 0.0,
+      "device_time_total_us": 12947.054000000044,
+      "name": "hotshift.probe"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 8943.929999999833,
+      "device_time_total_us": 97.37400000010803,
+      "name": "hotshift.probe_readback"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 7531.066000000138,
+      "device_time_total_us": 0.0,
+      "name": "hotshift.pack_misses"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 27075.25900000028,
+      "device_time_total_us": 951.5129999995406,
+      "name": "hotshift.transfer_misses"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 0.0,
+      "device_time_total_us": 14999.100999999871,
+      "name": "hotshift.transfer_misses"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 9549.577000000052,
+      "device_time_total_us": 15610.02000000016,
+      "name": "hotshift.pool"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 0.0,
+      "device_time_total_us": 15610.02000000016,
+      "name": "hotshift.pool"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 17331.74200000039,
+      "device_time_total_us": 445.4040000002806,
+      "name": "hotshift.output_copy"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 0.0,
+      "device_time_total_us": 260.66900000015994,
+      "name": "hotshift.output_copy"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 58541.27899999998,
+      "device_time_total_us": 0.0,
+      "name": "hotshift.policy_update"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 99079.28200000004,
+      "device_time_total_us": 2157.965000000744,
+      "name": "hotshift.maintenance"
+    },
+    {
+      "count": 143,
+      "cpu_time_total_us": 0.0,
+      "device_time_total_us": 32682.98600000013,
+      "name": "hotshift.maintenance"
+    }
+  ]
+}

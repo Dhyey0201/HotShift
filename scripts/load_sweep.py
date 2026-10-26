@@ -1,4 +1,4 @@
-"""Open-loop offered-load sweep against a running service (blueprint 17.4).
+"""Open-loop offered-load sweep against a running service.
 
 Finds sustainable throughput with a stepped ramp, then offers fractions of that measured rate.
 Offered loads are derived from measurement, never from invented targets.

@@ -1,0 +1,252 @@
+{
+  "backend": "cuda",
+  "cache_budget_bytes": 51200000,
+  "cache_fractions": [
+    0.1
+  ],
+  "command": [
+    "cli.py",
+    "bench-cuda",
+    "--matrix",
+    "configs/benchmark.yaml"
+  ],
+  "configuration": {
+    "benchmark": {
+      "baselines": [
+        "torch_cpu",
+        "torch_gpu_resident"
+      ],
+      "cache_conditions": [
+        "warm"
+      ],
+      "history_length": 32,
+      "microbatch_sizes": [
+        1,
+        16,
+        64
+      ],
+      "policies": [
+        "no_cache",
+        "static",
+        "lru",
+        "decayed_lfu",
+        "adaptive"
+      ],
+      "repeats": 3,
+      "requests": 100000,
+      "scenarios": [
+        "stable",
+        "abrupt",
+        "brief_burst",
+        "uniform"
+      ],
+      "verify_every": 50
+    },
+    "cache": {
+      "capacity": 100000,
+      "policy": "adaptive"
+    },
+    "data": {
+      "dimensions": 128,
+      "output_dir": "artifacts/data/standard",
+      "rows": 1000000,
+      "seed": 42
+    },
+    "limits": {
+      "max_batch_delay_ms": 2.0,
+      "max_batch_ids": 16384,
+      "max_batch_requests": 64,
+      "max_history_ids": 256,
+      "queue_capacity": 1024
+    },
+    "profile": "standard"
+  },
+  "configured_cache_capacity": 100000,
+  "dataset_sha256": "1cfb1b15d5f0f3c316d709533309f734586c64eef9bbbbfa05e06a63b3229384",
+  "dataset_version": "synthetic-v1",
+  "dimensions": 128,
+  "environment": {
+    "driver": "580.178.04",
+    "gpu": "Tesla T4",
+    "gpu_capability": [
+      7,
+      5
+    ],
+    "gpu_total_memory_bytes": 15636037632,
+    "host_memory_total_bytes": 33658155008,
+    "numpy": "2.1.3",
+    "nvcc": "Build cuda_12.8.r12.8/compiler.35583870_0",
+    "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python": "3.13.15",
+    "torch": "2.11.0+cu128",
+    "torch_cuda": "12.8"
+  },
+  "git_commit": "57cbca19aee29b37ae9fb11f79f9c3c057621e3b",
+  "git_dirty": false,
+  "limitations": [
+    "measurements apply only to the recorded hardware, driver, toolkit, data, and workload",
+    "no speedup is claimed without repeated matched-baseline analysis",
+    "CPU backend runs a cache simulator; its hit rates are policy semantics, not GPU performance"
+  ],
+  "memory_by_engine": {
+    "adaptive": {
+      "allocator_allocated_bytes": 64474624,
+      "allocator_peak_allocated_bytes": 64525824,
+      "allocator_peak_reserved_bytes": 75497472,
+      "allocator_reserved_bytes": 75497472,
+      "device_cache_rows_bytes": 51200000,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 9273864,
+      "device_tensor_bytes": 64473864,
+      "host_slot_mirror_bytes": 800000,
+      "host_staging_bytes": 9273864,
+      "host_staging_pinned": true,
+      "host_table_bytes": 512000000
+    },
+    "decayed_lfu": {
+      "allocator_allocated_bytes": 64474624,
+      "allocator_peak_allocated_bytes": 64525824,
+      "allocator_peak_reserved_bytes": 75497472,
+      "allocator_reserved_bytes": 75497472,
+      "device_cache_rows_bytes": 51200000,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 9273864,
+      "device_tensor_bytes": 64473864,
+      "host_slot_mirror_bytes": 800000,
+      "host_staging_bytes": 9273864,
+      "host_staging_pinned": true,
+      "host_table_bytes": 512000000
+    },
+    "lru": {
+      "allocator_allocated_bytes": 64474624,
+      "allocator_peak_allocated_bytes": 64525824,
+      "allocator_peak_reserved_bytes": 75497472,
+      "allocator_reserved_bytes": 75497472,
+      "device_cache_rows_bytes": 51200000,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 9273864,
+      "device_tensor_bytes": 64473864,
+      "host_slot_mirror_bytes": 800000,
+      "host_staging_bytes": 9273864,
+      "host_staging_pinned": true,
+      "host_table_bytes": 512000000
+    },
+    "no_cache": {
+      "allocator_allocated_bytes": 13274624,
+      "allocator_peak_allocated_bytes": 13325824,
+      "allocator_peak_reserved_bytes": 23068672,
+      "allocator_reserved_bytes": 23068672,
+      "device_cache_rows_bytes": 0,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 9273864,
+      "device_tensor_bytes": 13273864,
+      "host_slot_mirror_bytes": 0,
+      "host_staging_bytes": 9273864,
+      "host_staging_pinned": true,
+      "host_table_bytes": 512000000
+    },
+    "static": {
+      "allocator_allocated_bytes": 64474624,
+      "allocator_peak_allocated_bytes": 64525824,
+      "allocator_peak_reserved_bytes": 75497472,
+      "allocator_reserved_bytes": 75497472,
+      "device_cache_rows_bytes": 51200000,
+      "device_item_to_slot_bytes": 4000000,
+      "device_staging_bytes": 9273864,
+      "device_tensor_bytes": 64473864,
+      "host_slot_mirror_bytes": 800000,
+      "host_staging_bytes": 9273864,
+      "host_staging_pinned": true,
+      "host_table_bytes": 512000000
+    },
+    "torch_cpu": {
+      "allocator_peak_allocated_bytes": 0,
+      "allocator_peak_reserved_bytes": 0,
+      "host_table_bytes": 512000000
+    },
+    "torch_gpu_resident": {
+      "allocator_allocated_bytes": 512000000,
+      "allocator_peak_allocated_bytes": 512108544,
+      "allocator_peak_reserved_bytes": 515899392,
+      "allocator_reserved_bytes": 515899392,
+      "device_table_bytes": 512000000,
+      "device_tensor_bytes": 512000000,
+      "host_table_bytes": 512000000
+    }
+  },
+  "policy_mode": "serialized CUDA cache execution with deterministic offline replay",
+  "release_eligible": true,
+  "rows": 1000000,
+  "run_id": "20261026T013249Z-cuda-67ce68c2",
+  "sample_counts": {
+    "batch_samples": 9063600,
+    "summaries": 252,
+    "windows": 25200
+  },
+  "schema_version": 2,
+  "selected_matrix": {
+    "baselines": [
+      "torch_cpu",
+      "torch_gpu_resident"
+    ],
+    "cache_conditions": [
+      "warm"
+    ],
+    "cache_fractions": [],
+    "engine_variants": [
+      "optimized"
+    ],
+    "history_length": 32,
+    "microbatch_sizes": [
+      1,
+      16,
+      64
+    ],
+    "policies": [
+      "no_cache",
+      "static",
+      "lru",
+      "decayed_lfu",
+      "adaptive"
+    ],
+    "repeats": 3,
+    "requests": 100000,
+    "scenarios": [
+      "stable",
+      "abrupt",
+      "brief_burst",
+      "uniform"
+    ],
+    "verify_every": 50,
+    "window_requests": 1000
+  },
+  "smoke": false,
+  "timestamp_utc": "2026-10-26T04:12:47.259687+00:00",
+  "timing_notes": [
+    "batch_wall_ms spans one engine call: host planning, transfers, synchronization, kernels, policy update, and maintenance",
+    "device_ms is a CUDA event interval on the current stream around the engine call; it includes idle gaps while the host plans",
+    "request_throughput divides measured requests by summed batch wall time and excludes trace parsing",
+    "this serialized implementation does not overlap host planning with GPU work",
+    "per-request latency in offline replay equals its batch wall time; batch_samples.csv.gz is the documented requests.csv equivalent"
+  ],
+  "trace_sha256": {
+    "abrupt-seed42": "f479386e5412ad0635079d456eea4b4ddaeb6a2a40e78d45d9130886530a55a0",
+    "abrupt-seed43": "8f91c16777d8f01ee0fa23bed2ca2070f9ec73d5b315792c501cd0a95231368a",
+    "abrupt-seed44": "8dfb014a06b6f072c7b58ce38cad8153a6a1b82fdff5b33071e5b700942eab5d",
+    "brief_burst-seed42": "b7ecea98f2be104d328ff15f9b99a471391fed556a8a3e459e28e28647997e4d",
+    "brief_burst-seed43": "3ddbc2ff39a0039c4da6278f6bb9cccbc3d0d9ab75819b2ec29588a8987e0c3a",
+    "brief_burst-seed44": "d4a21dd33ed8cd0bba6255e0d9f47e0be22acd7527c43bf9da81fd95a5c96653",
+    "post_shift-seed42": "cc017b464cd7d120e93de9d3f2019b7dab8c1fd9451a67c86d40b918ff2a428b",
+    "post_shift-seed43": "6caa076da61d2820af81c9452ad510bf243334826707871687a7a0d9cb815a0d",
+    "post_shift-seed44": "142f851b20237aa9d7115cb0040f5db587f8824093c7fc8409ba49e18b7d24c9",
+    "stable-seed42": "b92f87990ec7491c9e1fbeeb981f3d9619aea2d290300da6cdaf53975104f667",
+    "stable-seed43": "f2de29d12d7f982388ee7f921e0e6b69ec862e710806893e5dc055dd85901d43",
+    "stable-seed44": "7eef0f375dc5e5c40baa770d05267d98f1ef591a86935a740ce9e37d95621de9",
+    "uniform-seed42": "c9de4e9cede5c1d4f85249fc39dc673df5a5f1326678ef5a2fb2063c90d265a0",
+    "uniform-seed43": "838fc4f79b19ded513d66370b7b08d2ea225409bf3fe15a1f853ddd08ba4c27e",
+    "uniform-seed44": "df1e702c41e6c5cb1e6d288872d521a4ab604d17073663a052192850c5cd0045"
+  },
+  "warnings": [],
+  "window_requests": 1000
+}

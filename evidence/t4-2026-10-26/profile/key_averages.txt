@@ -1,0 +1,43 @@
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                   hotshift.maintenance        26.35%      72.177ms        36.17%      99.079ms     692.862us       0.000us         0.00%       2.158ms      15.091us           143  
+                                 hotshift.policy_update        21.37%      58.541ms        21.37%      58.541ms     409.380us       0.000us         0.00%       0.000us       0.000us           143  
+                                            aten::copy_         5.81%      15.911ms        11.62%      31.840ms      20.241us       2.071ms        10.53%       2.071ms       1.316us          1573  
+                                   hotshift.deduplicate         5.49%      15.044ms         5.49%      15.044ms     105.203us       0.000us         0.00%       0.000us       0.000us           143  
+                                        cudaMemcpyAsync         5.14%      14.069ms         5.14%      14.069ms       8.944us       0.000us         0.00%       0.000us       0.000us          1573  
+                                            aten::slice         5.04%      13.800ms         6.29%      17.216ms       4.469us       0.000us         0.00%       0.000us       0.000us          3852  
+                               hotshift.transfer_misses         4.29%      11.745ms         9.88%      27.075ms     189.337us       0.000us         0.00%     951.513us       6.654us           143  
+                                         hotshift.probe         4.03%      11.039ms         9.83%      26.927ms     188.302us       0.000us         0.00%     876.211us       6.127us           143  
+                                   hotshift.output_copy         3.42%       9.368ms         6.33%      17.332ms     121.201us       0.000us         0.00%     445.404us       3.115us           143  
+                                       cudaLaunchKernel         3.39%       9.296ms         3.39%       9.296ms      13.056us       0.000us         0.00%       0.000us       0.000us           712  
+                                hotshift.probe_readback         2.78%       7.606ms         3.27%       8.944ms      62.545us       0.000us         0.00%      97.374us       0.681us           143  
+                                   hotshift.pack_misses         2.75%       7.531ms         2.75%       7.531ms      52.665us       0.000us         0.00%       0.000us       0.000us           143  
+                                   cudaEventSynchronize         1.57%       4.313ms         1.57%       4.313ms      10.054us     315.966us         1.61%     315.966us       0.737us           429  
+                                          hotshift.pool         1.38%       3.789ms         3.49%       9.550ms      66.780us       0.000us         0.00%      15.610ms     109.161us           143  
+                                       aten::as_strided         1.25%       3.416ms         1.25%       3.416ms       0.887us       0.000us         0.00%       0.000us       0.000us          3852  
+                                            aten::empty         1.18%       3.243ms         1.18%       3.243ms      11.341us       0.000us         0.00%       0.000us       0.000us           286  
+                                Activity Buffer Request         1.17%       3.200ms         1.17%       3.200ms       3.200ms       0.000us         0.00%       0.000us       0.000us             1  
+                                  cudaStreamIsCapturing         0.92%       2.513ms         0.92%       2.513ms       1.172us     254.272us         1.29%     254.272us       0.119us          2145  
+                              hotshift::update_mapping_         0.68%       1.864ms         1.86%       5.104ms      18.037us     969.336us         4.93%     969.336us       3.425us           283  
+                                    hotshift::pool_mean         0.60%       1.654ms         2.10%       5.761ms      40.285us      15.610ms        79.40%      15.610ms     109.161us           143  
+                                  hotshift::probe_slots         0.51%       1.407ms         1.94%       5.320ms      37.206us     499.064us         2.54%     499.064us       3.490us           143  
+                               cudaEventRecordWithFlags         0.43%       1.177ms         0.43%       1.177ms       2.744us      60.318us         0.31%      60.318us       0.141us           429  
+                                hotshift::scatter_rows_         0.29%     803.540us         0.76%       2.082ms      14.563us     510.844us         2.60%     510.844us       3.572us           143  
+                                    cudaStreamWaitEvent         0.14%     389.479us         0.14%     389.479us       2.724us     151.807us         0.77%     151.807us       1.062us           143  
+                                  cudaDeviceSynchronize         0.00%      10.591us         0.00%      10.591us      10.591us       0.000us         0.00%       0.000us       0.000us             1  
+                                         hotshift.probe         0.00%       0.000us         0.00%       0.000us       0.000us      12.947ms        65.85%      12.947ms      90.539us           143  
+                         Memcpy HtoD (Pinned -> Device)         0.00%       0.000us         0.00%       0.000us       0.000us       1.561ms         7.94%       1.561ms       1.213us          1287  
+(anonymous namespace)::probe_kernel(long const*, int...         0.00%       0.000us         0.00%       0.000us       0.000us     499.064us         2.54%     499.064us       3.490us           143  
+                         Memcpy DtoH (Device -> Pinned)         0.00%       0.000us         0.00%       0.000us       0.000us     510.202us         2.60%     510.202us       1.784us           286  
+                               hotshift.transfer_misses         0.00%       0.000us         0.00%       0.000us       0.000us      14.999ms        76.29%      14.999ms     104.889us           143  
+(anonymous namespace)::pool_kernel(float const*, flo...         0.00%       0.000us         0.00%       0.000us       0.000us      15.610ms        79.40%      15.610ms     109.161us           143  
+                                          hotshift.pool         0.00%       0.000us         0.00%       0.000us       0.000us      15.610ms        79.40%      15.610ms     109.161us           143  
+                                   hotshift.output_copy         0.00%       0.000us         0.00%       0.000us       0.000us     260.669us         1.33%     260.669us       1.823us           143  
+                                   hotshift.maintenance         0.00%       0.000us         0.00%       0.000us       0.000us      32.683ms       166.24%      32.683ms     228.552us           143  
+(anonymous namespace)::scatter_rows_kernel(float*, f...         0.00%       0.000us         0.00%       0.000us       0.000us     510.844us         2.60%     510.844us       3.572us           143  
+(anonymous namespace)::mapping_kernel(int*, long con...         0.00%       0.000us         0.00%       0.000us       0.000us     969.336us         4.93%     969.336us       3.425us           283  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 273.906ms
+Self CUDA time total: 19.660ms
+

@@ -1,4 +1,4 @@
-# Cache-fraction sweep (blueprint 17.4): fixed D=128 standard table, targeted policies.
+# Cache-fraction sweep: fixed D=128 standard table, targeted policies.
 profile: sweep_cache
 data:
   rows: 1000000

@@ -1,0 +1,196 @@
+[01:30:45] RUN: python3 scripts/preflight.py --backend cuda --config configs/benchmark.yaml --deep
+{
+  "architecture": "x86_64",
+  "capacity_estimate": {
+    "device_bytes": 64473864,
+    "device_limit_bytes": 10945455718,
+    "host_bytes": 644137728,
+    "host_limit_bytes": 15301201920,
+    "override_enabled": false,
+    "status": "available"
+  },
+  "cpu_status": "available",
+  "cuda_block_reason": null,
+  "cuda_runtime_status": "available",
+  "cuda_status": "available",
+  "cuda_toolkit_status": "available",
+  "deep": {
+    "counter_profiling": "restricted",
+    "counter_profiling_reason": "ERR_NVGPUCTRPERM: the host denies GPU performance counters",
+    "extension_kernel": "ok",
+    "timeline_profiling": "nsys unavailable; use hotshift profile-torch (CUPTI tracing)"
+  },
+  "device": "Tesla T4",
+  "device_free_bytes": 15636365312,
+  "gpu_device_status": "available",
+  "gpu_list": "GPU 0: Tesla T4 (UUID: GPU-0d9dd885-261d-52c4-fa74-36143a6ac0d2)\nGPU 1: Tesla T4 (UUID: GPU-2a3d969b-0900-044a-3a6a-9da42cb198d2)",
+  "host_memory_available_bytes": 25502003200,
+  "host_memory_total_bytes": 33658155008,
+  "nvcc": "/usr/local/cuda/bin/nvcc",
+  "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0",
+  "nvidia_smi": "/opt/bin/nvidia-smi",
+  "os": "Linux-6.18.55+-x86_64-with-glibc2.39",
+  "profiling_status": "unavailable_or_incomplete",
+  "profiling_tools": {
+    "compute-sanitizer": "/usr/local/cuda/bin/compute-sanitizer",
+    "ncu": "/usr/local/cuda/bin/ncu",
+    "nsys": null
+  },
+  "python": "3.13.15",
+  "requested_backend": "cuda",
+  "torch": "2.11.0+cu128",
+  "torch_cuda": "12.8"
+}
+[01:30:55] RUN: python3 -m hotshift.cli data generate --config configs/smoke.yaml --if-missing
+{"status": "exists", "config": "configs/smoke.yaml"}
+[01:30:55] RUN: python3 -m hotshift.cli data catalog --config configs/smoke.yaml
+{"catalog_items": 4096, "candidate_count": 512, "dataset_version": "synthetic-v1"}
+[01:30:55] RUN: python3 -m hotshift.cli build-extension
+HotShift CUDA extension built and loaded
+[01:30:58] GATE: CPU, integration, and CUDA tests with zero allowed CUDA skips
+[01:30:58] RUN: python3 -m pytest tests/cpu tests/integration tests/cuda -q -rfE -p no:cacheprovider
+..s..................................................................... [ 45%]
+.................................s...................................... [ 90%]
+...............                                                          [100%]
+157 passed, 2 skipped in 20.36s
+[01:31:23] GATE: Compute Sanitizer on owned kernels
+[01:31:23] RUN: bash scripts/run_sanitizers.sh
+HotShift CUDA extension built and loaded
+== memcheck ==
+.............................................                            [100%]
+45 passed, 2 deselected in 6.12s
+========= ERROR SUMMARY: 0 errors
+== initcheck ==
+.............................................                            [100%]
+45 passed, 2 deselected in 4.16s
+========= ERROR SUMMARY: 0 errors
+== synccheck ==
+.............................................                            [100%]
+45 passed, 2 deselected in 3.75s
+========= ERROR SUMMARY: 0 errors
+== racecheck ==
+.............................................                            [100%]
+45 passed, 2 deselected in 4.87s
+========= RACECHECK SUMMARY: 0 hazards displayed (0 errors, 0 warnings)
+[01:32:06] RUN: python3 -m hotshift.cli bench-cuda --matrix configs/smoke.yaml --smoke
+artifacts/runs/20261026T013209Z-cuda-f46bc4d1
+[01:32:11] RUN: python3 -m hotshift.cli bench-kernels --repeats 30
+artifacts/runs/20261026T013214Z-kernels-2a46fa6b
+[01:32:15] RUN: python3 -m hotshift.cli profile-torch --config configs/smoke.yaml
+/usr/local/lib/python3.13/dist-packages/torch/profiler/profiler.py:224: UserWarning: Warning: Profiler clears events at the end of each cycle.Only events from the current cycle will be reported.To keep events across cycles, set acc_events=True.
+  _warn_once(
+artifacts/profiles/20261026T013217Z-torchprof-5639e316
+{
+  "architecture": "x86_64",
+  "cpu_status": "available",
+  "cuda_block_reason": null,
+  "cuda_runtime_status": "available",
+  "cuda_status": "available",
+  "cuda_toolkit_status": "available",
+  "device": "Tesla T4",
+  "device_free_bytes": 15636365312,
+  "gpu_device_status": "available",
+  "gpu_list": "GPU 0: Tesla T4 (UUID: GPU-0d9dd885-261d-52c4-fa74-36143a6ac0d2)\nGPU 1: Tesla T4 (UUID: GPU-2a3d969b-0900-044a-3a6a-9da42cb198d2)",
+  "host_memory_available_bytes": 24961142784,
+  "host_memory_total_bytes": 33658155008,
+  "nvcc": "/usr/local/cuda/bin/nvcc",
+  "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0",
+  "nvidia_smi": "/opt/bin/nvidia-smi",
+  "os": "Linux-6.18.55+-x86_64-with-glibc2.39",
+  "profiling_status": "unavailable_or_incomplete",
+  "profiling_tools": {
+    "compute-sanitizer": "/usr/local/cuda/bin/compute-sanitizer",
+    "ncu": "/usr/local/cuda/bin/ncu",
+    "nsys": null
+  },
+  "python": "3.13.15",
+  "requested_backend": "cuda",
+  "torch": "2.11.0+cu128",
+  "torch_cuda": "12.8"
+}
+HotShift CUDA extension built and loaded
+==PROF== Connected to process 1606 (/usr/bin/python3.13)
+==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU Performance Counters on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM
+artifacts/runs/20261026T013231Z-cuda-1a7f5120
+==PROF== Disconnected from process 1606
+Nsight Compute failed; ERR_NVGPUCTRPERM means the host denies performance counters
+[01:32:39] RUN: python3 -m hotshift.cli data generate --config configs/benchmark.yaml --if-missing
+{
+  "chunk_rows": 8192,
+  "dataset_version": "synthetic-v1",
+  "dimensions": 128,
+  "dtype": "float32",
+  "embedding_sha256": "1cfb1b15d5f0f3c316d709533309f734586c64eef9bbbbfa05e06a63b3229384",
+  "generator": "numpy.default_rng.standard_normal",
+  "layout": "row_major",
+  "normalization": "unit_l2_per_row",
+  "rows": 1000000,
+  "schema_version": 1,
+  "seed": 42
+}
+[01:32:45] RUN: python3 -m hotshift.cli bench-cuda --matrix configs/benchmark.yaml
+artifacts/runs/20261026T013249Z-cuda-67ce68c2
+[04:15:21] RUN: python3 -m hotshift.cli bench-cuda --matrix configs/ablation.yaml
+artifacts/runs/20261026T041525Z-cuda-cf672a53
+[04:32:56] RUN: python3 -m hotshift.cli bench-cuda --matrix configs/sweep_cache.yaml
+artifacts/runs/20261026T043300Z-cuda-a80b131d
+[04:44:15] RUN: python3 -m hotshift.cli data generate --config configs/sweep_dim32.yaml --if-missing
+{
+  "chunk_rows": 8192,
+  "dataset_version": "synthetic-v1",
+  "dimensions": 32,
+  "dtype": "float32",
+  "embedding_sha256": "a1d06129facb15dbbdbad64d87ca34c5438268f2727c60b535ea3e4eca54a6b7",
+  "generator": "numpy.default_rng.standard_normal",
+  "layout": "row_major",
+  "normalization": "unit_l2_per_row",
+  "rows": 1000000,
+  "schema_version": 1,
+  "seed": 42
+}
+[04:44:17] RUN: python3 -m hotshift.cli bench-cuda --matrix configs/sweep_dim32.yaml
+artifacts/runs/20261026T044419Z-cuda-70844ddc
+[04:47:04] RUN: python3 -m hotshift.cli data generate --config configs/sweep_dim256.yaml --if-missing
+{
+  "chunk_rows": 8192,
+  "dataset_version": "synthetic-v1",
+  "dimensions": 256,
+  "dtype": "float32",
+  "embedding_sha256": "00a57103d7aa50646dd6efdb83cd19c7044944be2a52afccf51f1f6ace04f3dd",
+  "generator": "numpy.default_rng.standard_normal",
+  "layout": "row_major",
+  "normalization": "unit_l2_per_row",
+  "rows": 1000000,
+  "schema_version": 1,
+  "seed": 42
+}
+[04:47:15] RUN: python3 -m hotshift.cli bench-cuda --matrix configs/sweep_dim256.yaml
+artifacts/runs/20261026T044721Z-cuda-f852b250
+[04:50:16] RUN: python3 -m hotshift.cli data generate --config configs/demo.yaml --if-missing
+{
+  "chunk_rows": 8192,
+  "dataset_version": "synthetic-v1",
+  "dimensions": 128,
+  "dtype": "float32",
+  "embedding_sha256": "be7d081c4f05e2619dea4667c77c36734d6065364fc71bdb9550e453bab80ee7",
+  "generator": "numpy.default_rng.standard_normal",
+  "layout": "row_major",
+  "normalization": "unit_l2_per_row",
+  "rows": 250000,
+  "schema_version": 1,
+  "seed": 42
+}
+[04:50:18] RUN: python3 -m hotshift.cli data catalog --config configs/demo.yaml
+{"catalog_items": 4096, "candidate_count": 512, "dataset_version": "synthetic-v1"}
+[04:50:22] RUN: python3 scripts/load_sweep.py --config configs/demo.yaml
+{"capacity_probe_run": "20261026T045029Z-load-9ffc3528", "measured_successful_throughput": 86.32177787060017}
+{"fraction": 0.25, "offered_rate": 21.580444467650043, "run": "20261026T045509Z-load-4d908a8b", "successful": 6000, "rejected": 0, "p99_ms": 8.862408680609308}
+{"fraction": 0.5, "offered_rate": 43.160888935300086, "run": "20261026T045728Z-load-41be4050", "successful": 6000, "rejected": 0, "p99_ms": 8.62124870175791}
+{"fraction": 0.75, "offered_rate": 64.74133340295013, "run": "20261026T045901Z-load-948129f3", "successful": 6000, "rejected": 0, "p99_ms": 8.486724750254917}
+{"fraction": 1.0, "offered_rate": 86.32177787060017, "run": "20261026T050011Z-load-f5c2de1e", "successful": 6000, "rejected": 0, "p99_ms": 7.690016541714562}
+{"fraction": 1.25, "offered_rate": 107.90222233825021, "run": "20261026T050107Z-load-07dbb8e2", "successful": 6000, "rejected": 0, "p99_ms": 7.633958650035228}
+{"overload_run": "20261026T050224Z-load-9b8b891b"}
+[05:02:25] RUN: python3 -m hotshift.cli report --runs artifacts/runs --output artifacts/runs/REPORT.md
+artifacts/runs/REPORT.md
+[05:02:47] Evidence archive: artifacts/hotshift-gpu-evidence-20261026T050226Z.tar.gz
+[05:02:47] SUMMARY: all steps passed

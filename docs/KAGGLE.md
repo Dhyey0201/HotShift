@@ -1,6 +1,6 @@
 # Run the HotShift GPU gates on Kaggle
 
-Create a Python notebook, turn **Internet** on, and select a **GPU** accelerator (a T4 was used before). Each cell below is self-contained. The cells clone `https://github.com/Dhyey0201/HotShift` and check out the `BRANCH` named at the top of each cell (currently `complete-gpu-evidence`; set it to `main` once that branch is merged).
+Create a Python notebook, turn **Internet** on, and select a **GPU** accelerator (a T4 was used before). Each cell below is self-contained. The cells clone `https://github.com/Dhyey0201/HotShift` and check out the `BRANCH` named at the top of each cell (`main`).
 
 ## Cell 1: gates (about 15–30 minutes)
 
@@ -13,7 +13,7 @@ def run(*command):
     print("$", " ".join(command), flush=True)
     subprocess.run(command, check=True)
 
-BRANCH = "complete-gpu-evidence"
+BRANCH = "main"
 urllib.request.urlopen("https://github.com", timeout=15).close()  # fails fast if Internet is off
 repo = "/kaggle/working/HotShift"
 if not os.path.isdir(os.path.join(repo, ".git")):
@@ -33,7 +33,7 @@ Generates the 1M-row datasets and runs the standard matrix, the ablation, the ca
 
 ```python
 import os, subprocess, sys
-BRANCH = "complete-gpu-evidence"
+BRANCH = "main"
 os.chdir("/kaggle/working/HotShift")
 subprocess.run(["git", "fetch", "origin", BRANCH], check=True)
 subprocess.run(["git", "checkout", "-B", BRANCH, f"origin/{BRANCH}"], check=True)
@@ -47,7 +47,7 @@ Reruns just the open-loop load sweep (warmup, stepped capacity ramp, offered-loa
 
 ```python
 import os, subprocess, sys
-BRANCH = "complete-gpu-evidence"
+BRANCH = "main"
 os.chdir("/kaggle/working/HotShift")
 subprocess.run(["git", "fetch", "origin", BRANCH], check=True)
 subprocess.run(["git", "checkout", "-B", BRANCH, f"origin/{BRANCH}"], check=True)

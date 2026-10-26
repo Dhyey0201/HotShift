@@ -1,0 +1,13 @@
+{
+  "hardware": "Tesla T4 (Kaggle), driver 580.178.04",
+  "software": "CUDA 12.8.93, PyTorch 2.11.0+cu128, Python 3.13.15",
+  "recorded_commit": "57cbca19aee29b37ae9fb11f79f9c3c057621e3b",
+  "rewritten_commits": {
+    "57cbca19aee29b37ae9fb11f79f9c3c057621e3b": "f395eef19c162c7a3ff4c70905834a6b6e8508df"
+  },
+  "note": "Run manifests record 57cbca1. A later history rewrite that removed one unrelated root file renamed it to f395eef; src, csrc, and tests are unchanged.",
+  "commands": [
+    "bash scripts/gpu_evidence.sh",
+    "bash scripts/gpu_evidence.sh --load"
+  ]
+}

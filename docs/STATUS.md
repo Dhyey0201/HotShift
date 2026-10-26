@@ -8,7 +8,7 @@ Every milestone is implemented and validated, on the CPU locally and on a Tesla 
 
 - Locally: 110 Python tests, 11 frontend unit tests, 5 Playwright tests against the real CPU API, the production frontend build, ruff, and the Docker Compose CPU stack.
 - On the T4: 157 tests with `HOTSHIFT_REQUIRE_CUDA=1` and no CUDA skips. Compute Sanitizer memcheck, racecheck, initcheck, and synccheck are clean. The standard matrix, ablation, cache-fraction sweep, dimension sweeps, kernel microbenchmark, and `torch.profiler` capture are complete, with every output check passing.
-- `python3 scripts/release_check.py` passes, accepting that imported evidence because `src`, `csrc`, and `tests` are unchanged since the tested commit.
+- `python3 scripts/release_check.py` passes, accepting the committed evidence in `evidence/t4-2026-10-26/` because `src`, `csrc`, and `tests` are unchanged since the tested commit.
 
 The measured result is unfavorable to the dynamic policies: on the T4 they are slower than no caching (see [BENCHMARKS.md](BENCHMARKS.md) and [PERFORMANCE.md](PERFORMANCE.md) P5).
 
@@ -17,7 +17,7 @@ The measured result is unfavorable to the dynamic policies: on the T4 they are s
 | ID | Requirement | State | Evidence or remaining gate |
 | --- | --- | --- | --- |
 | R01 | Correct mean pooling | complete | `tests/cpu/test_pooling.py`; `tests/cuda/test_operators.py` on the T4; max abs error 0 in `20261026T013214Z-kernels-2a46fa6b` |
-| R02 | Custom CUDA operations | complete | `csrc/` probe, gather, pool, scatter, mapping kernels; `tests/cuda`; clean logs in `artifacts/sanitizers/` |
+| R02 | Custom CUDA operations | complete | `csrc/` probe, gather, pool, scatter, mapping kernels; `tests/cuda`; clean logs in `evidence/t4-2026-10-26/sanitizers/` |
 | R03 | Bounded GPU cache | complete | 64.5 MB device memory for every cache mode vs 512 MB full-table reference, in every summary's `memory` |
 | R04 | Safe slot reuse | complete | Maintenance protocol in ARCHITECTURE; randomized GPU invariants and racecheck/synccheck clean on the T4 |
 | R05 | Adaptive behavior | complete (measured, unfavorable) | Shift detection and bounded budgets work; abrupt recovery 20,000 requests vs LRU 2,000 (`20261026T013249Z-cuda-67ce68c2`) |

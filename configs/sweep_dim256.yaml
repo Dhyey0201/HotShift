@@ -1,4 +1,4 @@
-# Dimension sweep (blueprint 17.4): D=256, same rows and 10 percent cache budget.
+# Dimension sweep: D=256, same rows and 10 percent cache budget.
 profile: sweep_dim256
 data:
   rows: 1000000

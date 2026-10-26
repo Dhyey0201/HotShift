@@ -1,4 +1,4 @@
-"""Release gate (blueprint section 28). Exits 0 only when every mandatory check passes.
+"""Release gate. Exits 0 only when every mandatory check passes.
 
 CPU-side checks always run. Without a CUDA host the script exits 2 (BLOCKED) after them;
 it never reports skipped GPU work as passed. A JSON release summary is written either way.
@@ -53,24 +53,40 @@ def claim_scan() -> bool:
     return record("unsupported claim scan", not offenders, ", ".join(offenders))
 
 
-def gpu_evidence() -> bool:
-    runs = [path for path in (ROOT / "artifacts" / "runs").glob("*-cuda-*") if is_complete_run(path)]
+def evidence_roots() -> list[Path]:
+    """Local ``artifacts/`` first, then committed evidence folders under ``evidence/``."""
+    return [ROOT / "artifacts", *sorted(path for path in (ROOT / "evidence").glob("*") if path.is_dir())]
+
+
+def gpu_evidence(root: Path | None = None) -> bool:
+    roots = [root] if root else evidence_roots()
     full = []
-    for path in runs:
+    for path in (run for base in roots for run in sorted((base / "runs").glob("*-cuda-*"))):
+        if not is_complete_run(path):
+            continue
         manifest = json.loads((path / "manifest.json").read_text())
         summary = json.loads((path / "summary.json").read_text())
         scenarios = {row["scenario"] for row in summary}
         required = {"stable", "abrupt", "brief_burst", "uniform"}
         if not manifest.get("smoke") and required <= scenarios and all(row["output_check"]["passed"] for row in summary):
-            full.append(path.name)
-    return record("full CUDA matrix with verified outputs", bool(full), ", ".join(full) or "no complete non-smoke CUDA run under artifacts/runs")
+            full.append(path.relative_to(ROOT).as_posix())
+    return record("full CUDA matrix with verified outputs", bool(full), ", ".join(full) or "no complete non-smoke CUDA run found")
 
 
-def resolve_commit(commit: str) -> str | None:
-    """Return ``commit`` if it exists, else its rewritten ID from a ``git filter-repo`` commit map."""
+def resolve_commit(commit: str, root: Path) -> str | None:
+    """Return ``commit`` if it exists, else its ID after a history rewrite.
+
+    A rewrite keeps code trees but changes commit IDs. The mapping comes from the evidence
+    folder's ``provenance.json`` (``rewritten_commits``) or a local ``git filter-repo`` map.
+    """
     exists = subprocess.run(["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=ROOT, check=False, capture_output=True)
     if exists.returncode == 0:
         return commit
+    provenance = root / "provenance.json"
+    if provenance.is_file():
+        rewritten = json.loads(provenance.read_text(encoding="utf-8")).get("rewritten_commits", {})
+        if commit in rewritten:
+            return resolve_commit(rewritten[commit], root) if rewritten[commit] != commit else None
     commit_map = ROOT / ".git" / "filter-repo" / "commit-map"
     if commit_map.is_file():
         for line in commit_map.read_text(encoding="utf-8").splitlines():
@@ -83,35 +99,35 @@ def resolve_commit(commit: str) -> str | None:
 def imported_gpu_evidence() -> bool:
     """Accept GPU gates run elsewhere (for example Kaggle) when the tested code matches HEAD.
 
-    Requires the evidence log from ``scripts/gpu_evidence.sh`` to report every step passed, the
-    four sanitizer logs to be clean, and a full verified CUDA matrix whose commit has the same
-    ``src``, ``csrc``, and ``tests`` as this checkout.
+    Looks in ``artifacts/`` and each ``evidence/*`` folder for the log from
+    ``scripts/gpu_evidence.sh`` reporting every step passed, four clean sanitizer logs, and a
+    full verified CUDA matrix whose commit has the same ``src``, ``csrc``, and ``tests`` as HEAD.
     """
-    log = ROOT / "artifacts" / "logs" / "gpu_evidence.log"
-    if not log.is_file():
+    root = next((base for base in evidence_roots() if (base / "logs" / "gpu_evidence.log").is_file()), None)
+    if root is None:
         return False
+    log = root / "logs" / "gpu_evidence.log"
     text = log.read_text(encoding="utf-8", errors="replace")
     tests = re.findall(r"^(\d+) passed(?:, (\d+) skipped)?[^\n]*$", text, re.MULTILINE)
     ok = record("imported GPU evidence log", "SUMMARY: all steps passed" in text and bool(tests) and not re.search(r"^\d+ failed", text, re.MULTILINE),
                 f"{log.relative_to(ROOT)}; test lines: {', '.join(t[0] + ' passed' for t in tests)}")
-    sanitizers = ROOT / "artifacts" / "sanitizers"
     dirty = []
     for tool in ("memcheck", "racecheck", "initcheck", "synccheck"):
-        path = sanitizers / f"{tool}.log"
+        path = root / "sanitizers" / f"{tool}.log"
         content = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
         if not re.search(r"(ERROR SUMMARY: 0 errors|RACECHECK SUMMARY: 0 hazards)", content):
             dirty.append(tool)
     ok &= record("imported Compute Sanitizer logs", not dirty, ", ".join(dirty) or "memcheck, racecheck, initcheck, synccheck clean")
-    if not gpu_evidence():
+    if not gpu_evidence(root):
         return False
     commits = set()
-    for path in (ROOT / "artifacts" / "runs").glob("*-cuda-*"):
+    for path in (root / "runs").glob("*-cuda-*"):
         if is_complete_run(path):
             manifest = json.loads((path / "manifest.json").read_text())
             if not manifest.get("smoke") and not manifest.get("git_dirty"):
                 commits.add(manifest.get("git_commit"))
     matching = [
-        commit for commit in commits if commit and (resolved := resolve_commit(commit)) and subprocess.run(
+        commit for commit in commits if commit and (resolved := resolve_commit(commit, root)) and subprocess.run(
             ["git", "diff", "--quiet", resolved, "HEAD", "--", "src", "csrc", "tests"], cwd=ROOT, check=False,
         ).returncode == 0
     ]

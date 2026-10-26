@@ -1,6 +1,6 @@
 # Release checklist
 
-Blueprint section 28. `python3 scripts/release_check.py` automates the checks marked ⚙ and writes `artifacts/release/release_summary.json` (commit, dirty flag, environment, results, remaining optional work). On a host without CUDA it accepts imported evidence from `scripts/gpu_evidence.sh` (the step log with every step passed, four clean sanitizer logs, and a verified full CUDA matrix whose commit has the same `src`, `csrc`, and `tests` as `HEAD`); without that evidence it exits 2 (BLOCKED).
+`python3 scripts/release_check.py` automates the checks marked ⚙ and writes `artifacts/release/release_summary.json` (commit, dirty flag, environment, results, remaining optional work). On a host without CUDA it accepts imported evidence from `scripts/gpu_evidence.sh`, in `artifacts/` or a committed `evidence/*` folder (the step log with every step passed, four clean sanitizer logs, and a verified full CUDA matrix whose commit has the same `src`, `csrc`, and `tests` as `HEAD`); without that evidence it exits 2 (BLOCKED).
 
 | Item | State | How it is verified |
 | --- | --- | --- |
@@ -22,4 +22,4 @@ Blueprint section 28. `python3 scripts/release_check.py` automates the checks ma
 
 Open item outside the checklist: `Dockerfile.cuda` has not been built or pinned.
 
-Legend: ✅ done, ⏳ waiting on a GPU run.
+Legend: ✅ done, ⚙ automated by the release check.

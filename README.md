@@ -23,11 +23,30 @@ Custom CUDA components (all in `csrc/`): `probe_slots` (dense item→slot map lo
 
 Cache modes: `no_cache`, `static` (fixed set from a warmup prefix), `lru`, `decayed_lfu`, and `adaptive` (decayed frequency plus a sketch-based shift detector with bounded replacement budgets). Baselines: PyTorch `embedding_bag` on CPU, and a fully GPU-resident PyTorch table (a higher-memory reference, not an equal-budget competitor).
 
-## Status
+## Results (Tesla T4)
 
-Every milestone is implemented and validated. On a Tesla T4 (Kaggle), 157 tests pass with no CUDA skips, Compute Sanitizer finds no errors or hazards, and the full benchmark matrix, ablation, and sweeps completed with every output verified. `scripts/release_check.py` passes against that evidence.
+Measured on a Kaggle Tesla T4 with a 1M × 128 FP32 table (512 MB) and a cache budget of 10% of its rows. All GPU gates pass: 157 tests with no CUDA skips, and Compute Sanitizer memcheck, racecheck, initcheck, and synccheck are clean. Every configuration's outputs were verified against the CPU reference. Summaries, logs, and the full report are in [evidence/t4-2026-10-26/](evidence/t4-2026-10-26/).
 
-**Main finding:** on the T4, the bounded cache uses 8× less GPU memory than a full-table copy (64.5 MB vs 512 MB) and cuts host→device traffic by up to 75%. It does not raise throughput, though: only the static cache beats no caching (+9% to +17% at batch 16–64), and the LRU, decayed-frequency, and adaptive policies are 1.2× to 4.8× slower than no caching, because their Python bookkeeping costs more than the transfers they save. The adaptive policy recovers from an abrupt shift 10× slower than LRU. Details and run IDs are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/PERFORMANCE.md](docs/PERFORMANCE.md). To reproduce, run `bash scripts/gpu_evidence.sh` on an NVIDIA host (see [docs/KAGGLE.md](docs/KAGGLE.md)). [docs/STATUS.md](docs/STATUS.md) maps every requirement to its evidence, and [docs/RELEASE.md](docs/RELEASE.md) tracks the release checklist.
+Stable traffic, median requests/s over 3 seeds (hit rate in parentheses):
+
+| Engine | Batch 1 | Batch 16 | Batch 64 | GPU memory |
+| --- | ---: | ---: | ---: | ---: |
+| `no_cache` | 1,459 | 16,178 | 41,108 | 13 MB |
+| `static` (0.89) | 1,487 | 17,669 | 47,968 | 64.5 MB |
+| `lru` (0.89) | 875 | 6,229 | 10,502 | 64.5 MB |
+| `adaptive` (0.89) | 1,174 | 10,438 | 20,712 | 64.5 MB |
+| `torch_gpu_resident` (full-table reference) | 4,336 | 42,414 | 98,260 | 512 MB |
+
+![Window hit rate around an abrupt popularity shift: LRU and decayed LFU recover within about 2,000 requests, adaptive takes about 20,000, static never recovers](evidence/t4-2026-10-26/charts/20261026T013249Z-cuda-67ce68c2-abrupt_hit_rate.svg)
+
+What the measurements show:
+
+- **The cache saves memory and bandwidth, not time, on this GPU.** It uses 8× less device memory than the full table and cuts host→device bytes by up to 75%, but only the static cache is faster than no caching (+9% to +17% at batch 16–64). The dynamic policies are 1.2× to 4.8× slower.
+- **The bottleneck is host-side Python, not the GPU.** Kernels take about 0.25 ms per batch; LRU's policy bookkeeping alone takes 3.2 ms at batch 64 ([PERFORMANCE.md](docs/PERFORMANCE.md), P5).
+- **Adaptive trades recovery speed for stability.** Its bounded replacement budget avoids churn but recovers from an abrupt shift 10× slower than LRU (20,000 vs 2,000 requests).
+- **The HTTP service sustains 250 req/s** with p99 13 ms and fails its objective at 400 req/s, so the single Python worker, not the engine, bounds serving.
+
+These results describe one GPU and one workload, where the table fits on the device and PCIe is fast. The design targets the opposite case, tables larger than GPU memory, which this hardware did not test. Full methodology, sweeps, ablations, and losing cases: [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Quick start (CPU development mode)
 
@@ -70,7 +89,7 @@ GPU mode fails clearly when CUDA is unavailable and never falls back to CPU. Run
 
 ## Documents
 
-[Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md) · [Benchmarks](docs/BENCHMARKS.md) · [Performance log](docs/PERFORMANCE.md) · [Decisions](docs/DECISIONS.md) · [Status](docs/STATUS.md) · [Demo script](docs/DEMO.md) · [Release checklist](docs/RELEASE.md) · [Kaggle GPU runs](docs/KAGGLE.md)
+[Status](docs/STATUS.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md) · [Benchmarks](docs/BENCHMARKS.md) · [Performance log](docs/PERFORMANCE.md) · [Decisions](docs/DECISIONS.md) · [Demo script](docs/DEMO.md) · [Release checklist](docs/RELEASE.md) · [Kaggle GPU runs](docs/KAGGLE.md)
 
 ## Credits and license
 

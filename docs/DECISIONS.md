@@ -1,6 +1,6 @@
 # Engineering decisions
 
-Material deviations from, or interpretations of, the blueprint. Each lists its reason and the tests that cover it.
+Material design choices and deviations from the original plan. Each lists its reason and the tests that cover it.
 
 ## Environment and scope
 
@@ -22,7 +22,7 @@ Material deviations from, or interpretations of, the blueprint. Each lists its r
 ## Policies
 
 - **Decayed frequency uses inflated weights.** Each occurrence adds `(1/0.8)^w`, which is exactly equivalent to multiplying all scores by 0.8 at each window boundary but needs no O(N) pass; scores renormalize before overflow. A partial window counts at full weight (as if it completed now), and `flush()` closes it at end of run.
-- **Adaptive empty-slot fills are unbudgeted.** The blueprint's per-window budget (256 normal, 1024 shift) is applied to replacements. Filling an empty slot evicts nothing and copies a row already on the device, while budgeting fills would leave a 100k-row cache cold for hundreds of windows. Row and byte limits both apply to replacements.
+- **Adaptive empty-slot fills are unbudgeted.** The planned per-window budget (256 normal, 1024 shift) is applied to replacements. Filling an empty slot evicts nothing and copies a row already on the device, while budgeting fills would leave a 100k-row cache cold for hundreds of windows. Row and byte limits both apply to replacements.
 - **Static warm set in the live service** comes from a seeded 2000-request prefix of the stable distribution, separate from any live traffic.
 
 ## Traffic and measurement

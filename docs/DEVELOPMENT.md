@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- |
 | Local development (Apple Silicon) | 3.14.3 | 2.14.1 CPU | none | CPU, API, UI, Docker CPU validated |
 | CPU lock / CI / Docker | 3.11 | CPU wheel in CI only | none | `requirements/cpu-py311-linux.lock` |
-| Kaggle GPU (earlier validation) | 3.13.15 | 2.11.0+cu128 | toolkit 12.8.93, Tesla T4 | pre-rewrite code; rerun required |
+| Kaggle GPU | 3.13.15 | 2.11.0+cu128 | toolkit 12.8.93, Tesla T4 | all GPU gates and benchmarks ([evidence](../evidence/t4-2026-10-26/)) |
 
 The lock (`requirements/cpu-py311-linux.lock`) pins the CPU service and test stack for Linux, Python 3.11, generated with `uv pip compile pyproject.toml --extra dev --extra service --python-version 3.11 --python-platform x86_64-manylinux_2_28`. PyTorch is deliberately not locked: install the build that matches the host's CUDA toolkit and driver first, then the project. Every benchmark manifest records the resolved Python, NumPy, PyTorch, CUDA, driver, `nvcc`, and GPU versions.
 
