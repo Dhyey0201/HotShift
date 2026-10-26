@@ -8,16 +8,10 @@ This is an engineering portfolio project, not a trained recommender or a product
 
 ## Architecture
 
-```text
- HTTP clients ──► FastAPI (validation, 422/429/503/504) ──► bounded FIFO queue (1024)
-                                                                │ microbatch: ≤64 requests,
-                                                                │ ≤16384 IDs, ≤2 ms wait
-                                                                ▼
-                                          single engine worker thread (owns all GPU state)
-   host: dedupe IDs ─► probe readback ─► pack misses (pinned) ─► policy ─► maintenance plan
-   GPU:   hotshift::probe_slots ─────────► hotshift::pool_mean ─────────► scatter_rows_ + update_mapping_
-                     item_to_slot[N]        cache_rows[C,D] + miss rows      (invalidate → copy → publish)
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.svg">
+  <img alt="HotShift architecture: clients call a FastAPI process whose batch scheduler feeds one engine worker thread; the host engine deduplicates IDs, probes the GPU slot map, packs misses from a memory-mapped CPU table, pools on the GPU, and applies policy admissions and evictions with scatter and map-update kernels" src="docs/architecture-light.svg">
+</picture>
 
 Custom CUDA components (all in `csrc/`): `probe_slots` (dense item→slot map lookup), `gather_rows` (validation and comparison path), `pool_mean` (fused mean pooling over cache and miss rows through descriptors), `scatter_rows_` (copies admitted rows into reserved slots), and `update_mapping_` (invalidates and publishes map entries). Transfers use standard CUDA copies through PyTorch. See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the batch order, event ordering, slot lifetime protocol, and memory equations.
 
